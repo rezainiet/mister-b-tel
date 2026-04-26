@@ -31,7 +31,11 @@ import {
   getTelegramGroupUrl,
   replaceTelegramGroupUrlInText,
 } from "./telegramGroupLink";
-import { scheduleTelegramReminderSequence, skipPendingTelegramReminderJobs } from "./telegramReminders";
+import {
+  renderTelegramWelcomeMessage,
+  scheduleTelegramReminderSequence,
+  skipPendingTelegramReminderJobs,
+} from "./telegramReminders";
 
 const TELEGRAM_DIRECT_CONTACT = "@MisterBNMB";
 const META_RETRY_DELAY_MS = 5 * 60 * 1000;
@@ -522,12 +526,13 @@ export function setupTelegramWebhook(app: Express) {
         getSetting("welcome_message"),
         getTelegramGroupUrl(),
       ]);
-      await sendTelegramMessage(
-        telegramMessage.from.id,
-        welcomeMsg
-          ? replaceTelegramGroupUrlInText(welcomeMsg, currentGroupUrl)
-          : buildDefaultWelcomeMessage(currentGroupUrl),
-      );
+      const welcomeBody = welcomeMsg
+        ? renderTelegramWelcomeMessage(
+            replaceTelegramGroupUrlInText(welcomeMsg, currentGroupUrl),
+            { firstName: telegramMessage.from.first_name || null, groupUrl: currentGroupUrl },
+          )
+        : buildDefaultWelcomeMessage(currentGroupUrl);
+      await sendTelegramMessage(telegramMessage.from.id, welcomeBody);
     }
 
     const memberUpdate = update.chat_member || update.my_chat_member;

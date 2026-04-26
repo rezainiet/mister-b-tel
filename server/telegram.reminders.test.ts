@@ -51,7 +51,9 @@ describe("telegram reminders", () => {
     expect(new Set(drafts.map((draft) => draft.messageText)).size).toBe(7);
 
     const dueOffsets = drafts.map((draft) => draft.dueAt.getTime() - startedAt.getTime());
-    expect(dueOffsets).toEqual(TELEGRAM_REMINDER_STEPS.map((step) => step.delayMs));
+    expect(dueOffsets).toEqual(
+      TELEGRAM_REMINDER_STEPS.map((step) => step.defaultDelayMin * 60 * 1000),
+    );
 
     expect(drafts[0]?.messageText).toContain("Je te renvoie l’accès au canal privé Mister B");
     expect(drafts[0]?.messageText).toContain("https://t.me/");

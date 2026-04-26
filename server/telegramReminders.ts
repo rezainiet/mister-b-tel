@@ -17,48 +17,89 @@ export const TELEGRAM_REMINDER_STEPS = [
   {
     key: "15m",
     settingKey: "telegram_reminder_15m_message",
-    delayMs: 15 * 60 * 1000,
+    delaySettingKey: "telegram_reminder_15m_delay_min",
+    label: "Reminder 1 (15 min)",
+    description: "First reminder if not joined.",
+    defaultDelayMin: 15,
     defaultTemplate: "Je te renvoie l’accès au canal privé Mister B. Tu y retrouveras les nouveautés, les infos réservées et le contenu partagé en privé. Rejoins-le maintenant ici → {group_url}",
   },
   {
     key: "1h",
     settingKey: "telegram_reminder_1h_message",
-    delayMs: 60 * 60 * 1000,
+    delaySettingKey: "telegram_reminder_1h_delay_min",
+    label: "Reminder 2 (1 h)",
+    description: "Second reminder if not joined.",
+    defaultDelayMin: 60,
     defaultTemplate: "Je me permets de te renvoyer le lien du canal privé Mister B au cas où tu n’aurais pas eu le temps tout à l’heure. L’accès est toujours disponible ici → {group_url}",
   },
   {
     key: "4h",
     settingKey: "telegram_reminder_4h_message",
-    delayMs: 4 * 60 * 60 * 1000,
+    delaySettingKey: "telegram_reminder_4h_delay_min",
+    label: "Reminder 3 (4 h)",
+    description: "Third reminder if not joined.",
+    defaultDelayMin: 4 * 60,
     defaultTemplate: "Le canal privé Mister B est toujours ouvert pour toi. Si tu veux voir les nouveautés et le contenu réservé, tu peux le rejoindre directement ici → {group_url}",
   },
   {
     key: "24h",
     settingKey: "telegram_reminder_24h_message",
-    delayMs: 24 * 60 * 60 * 1000,
+    delaySettingKey: "telegram_reminder_24h_delay_min",
+    label: "Reminder 4 (24 h)",
+    description: "24h reminder after /start.",
+    defaultDelayMin: 24 * 60,
     defaultTemplate: "Petit rappel : si tu n’as pas encore rejoint le canal privé Mister B, ton accès est toujours disponible. Tu peux entrer directement ici → {group_url}",
   },
   {
     key: "1w",
     settingKey: "telegram_reminder_1w_message",
-    delayMs: 7 * 24 * 60 * 60 * 1000,
+    delaySettingKey: "telegram_reminder_1w_delay_min",
+    label: "Reminder 5 (1 week)",
+    description: "Weekly nudge if still not joined.",
+    defaultDelayMin: 7 * 24 * 60,
     defaultTemplate: "Je te renvoie l’accès au canal privé Mister B pour cette semaine. Si tu voulais rejoindre mais que tu as repoussé, c’est le bon moment pour entrer → {group_url}",
   },
   {
     key: "2w",
     settingKey: "telegram_reminder_2w_message",
-    delayMs: 14 * 24 * 60 * 60 * 1000,
+    delaySettingKey: "telegram_reminder_2w_delay_min",
+    label: "Reminder 6 (2 weeks)",
+    description: "Two-week nudge if still not joined.",
+    defaultDelayMin: 14 * 24 * 60,
     defaultTemplate: "Je reviens vers toi avec le lien du canal privé Mister B. Si tu es toujours intéressé, tu peux rejoindre l’espace privé ici → {group_url}",
   },
   {
     key: "1m",
     settingKey: "telegram_reminder_1m_message",
-    delayMs: 30 * 24 * 60 * 60 * 1000,
+    delaySettingKey: "telegram_reminder_1m_delay_min",
+    label: "Reminder 7 (1 month)",
+    description: "Final monthly reminder.",
+    defaultDelayMin: 30 * 24 * 60,
     defaultTemplate: "Dernier rappel de ma part : si tu veux encore accéder au canal privé Mister B et aux infos réservées, voici le lien direct → {group_url}",
   },
 ] as const;
 
 export type TelegramReminderStep = (typeof TELEGRAM_REMINDER_STEPS)[number];
+
+const REMINDER_DELAY_MIN = 1; // minutes
+const REMINDER_DELAY_MAX = 60 * 24 * 365; // 1 year cap (sanity)
+
+function parseDelayMinutes(raw: string | null, fallback: number) {
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return fallback;
+  const clamped = Math.max(REMINDER_DELAY_MIN, Math.min(REMINDER_DELAY_MAX, Math.floor(parsed)));
+  return clamped;
+}
+
+export function isValidReminderDelayMinutes(value: number) {
+  return Number.isFinite(value) && value >= REMINDER_DELAY_MIN && value <= REMINDER_DELAY_MAX;
+}
+
+export const TELEGRAM_REMINDER_DELAY_BOUNDS = {
+  min: REMINDER_DELAY_MIN,
+  max: REMINDER_DELAY_MAX,
+} as const;
 
 type ReminderTemplateContext = {
   firstName?: string | null;
@@ -82,7 +123,9 @@ export function renderTelegramReminderMessage(template: string, context: Reminde
 
   const renderedMessage = template
     .replaceAll("{first_name}", firstName)
+    .replaceAll("{firstName}", firstName)
     .replaceAll("{group_url}", groupUrl)
+    .replaceAll("{groupLink}", groupUrl)
     .replaceAll("{brand}", "Mister B")
     .replaceAll(/\n{3,}/g, "\n\n")
     .trim();
@@ -94,33 +137,59 @@ export function renderTelegramReminderMessage(template: string, context: Reminde
   return `${renderedMessage}\n\n${TELEGRAM_DIRECT_CONTACT_LINE}`.trim();
 }
 
-async function getReminderTemplates() {
-  const templates = await Promise.all(
+// Render the welcome message with the same variable substitution as reminders
+// (first name + group URL aliases) AND apply the same URL-rewrite the
+// admin's link-editor performs, so legacy welcome messages stored before this
+// change still update when the group URL changes.
+export function renderTelegramWelcomeMessage(template: string, context: ReminderTemplateContext = {}) {
+  const groupUrl = context.groupUrl || DEFAULT_TELEGRAM_GROUP_URL;
+  const firstName = (context.firstName || "").trim() || "toi";
+
+  return template
+    .replaceAll("{first_name}", firstName)
+    .replaceAll("{firstName}", firstName)
+    .replaceAll("{group_url}", groupUrl)
+    .replaceAll("{groupLink}", groupUrl)
+    .replaceAll("{brand}", "Mister B")
+    .trim();
+}
+
+export type ResolvedReminderStep = TelegramReminderStep & {
+  template: string;
+  delayMs: number;
+  delayMin: number;
+};
+
+export async function getResolvedReminderSteps(): Promise<ResolvedReminderStep[]> {
+  return Promise.all(
     TELEGRAM_REMINDER_STEPS.map(async (step) => {
-      const stored = await getSetting(step.settingKey);
+      const [storedTemplate, storedDelay] = await Promise.all([
+        getSetting(step.settingKey),
+        getSetting(step.delaySettingKey),
+      ]);
+      const delayMin = parseDelayMinutes(storedDelay, step.defaultDelayMin);
       return {
         ...step,
-        template: stored || step.defaultTemplate,
-      };
+        template: storedTemplate || step.defaultTemplate,
+        delayMin,
+        delayMs: delayMin * 60 * 1000,
+      } satisfies ResolvedReminderStep;
     }),
   );
-
-  return templates;
 }
 
 export async function buildTelegramReminderDrafts(input: BuildReminderDraftsInput) {
   const startedAt = input.startedAt || new Date();
-  const [templates, groupUrl] = await Promise.all([getReminderTemplates(), getTelegramGroupUrl()]);
+  const [steps, groupUrl] = await Promise.all([getResolvedReminderSteps(), getTelegramGroupUrl()]);
 
-  return templates.map((step) => ({
+  return steps.map((step) => ({
     telegramUserId: input.telegramUserId,
     chatId: input.chatId,
     reminderKey: step.key,
-      messageText: renderTelegramReminderMessage(step.template, {
-        firstName: input.firstName,
-        groupUrl,
-      }),
-
+    messageText: renderTelegramReminderMessage(step.template, {
+      firstName: input.firstName,
+      groupUrl,
+    }),
     dueAt: new Date(startedAt.getTime() + step.delayMs),
   }));
 }

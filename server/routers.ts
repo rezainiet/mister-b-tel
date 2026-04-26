@@ -42,8 +42,15 @@ import {
 } from "./db";
 import { sendPageView } from "./facebookCapi";
 import { buildServerFbc, retryStoredMetaRequest } from "./metaCapi";
-import { getUtmSessionByToken } from "./db";
+import { getUtmSessionByToken, getSetting } from "./db";
 import { syncTelegramGroupUrlContent, TELEGRAM_GROUP_URL_SETTING_KEY, validateTelegramGroupUrl } from "./telegramGroupLink";
+import {
+  TELEGRAM_REMINDER_DELAY_BOUNDS,
+  TELEGRAM_REMINDER_STEPS,
+  isValidReminderDelayMinutes,
+} from "./telegramReminders";
+import { buildDefaultWelcomeMessage } from "./telegramWebhook";
+import { getTelegramGroupUrl } from "./telegramGroupLink";
 
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || "Misternb_bot";
 
@@ -92,6 +99,25 @@ function isAllowedTrackingOrigin(origin: string, host: string) {
 const dashboardAuthInput = z.object({
   token: z.string().min(1),
 });
+
+const WELCOME_MESSAGE_SETTING_KEY = "welcome_message";
+const REMINDER_MESSAGE_SETTING_KEYS = TELEGRAM_REMINDER_STEPS.map((step) => step.settingKey);
+const REMINDER_DELAY_SETTING_KEYS = TELEGRAM_REMINDER_STEPS.map((step) => step.delaySettingKey);
+
+const TELEGRAM_MESSAGE_SETTING_KEYS = new Set<string>([
+  WELCOME_MESSAGE_SETTING_KEY,
+  ...REMINDER_MESSAGE_SETTING_KEYS,
+]);
+const TELEGRAM_DELAY_SETTING_KEYS = new Set<string>(REMINDER_DELAY_SETTING_KEYS);
+
+const TELEGRAM_SETTING_ALLOWLIST = new Set<string>([
+  TELEGRAM_GROUP_URL_SETTING_KEY,
+  WELCOME_MESSAGE_SETTING_KEY,
+  ...REMINDER_MESSAGE_SETTING_KEYS,
+  ...REMINDER_DELAY_SETTING_KEYS,
+]);
+
+const TELEGRAM_MESSAGE_MAX_LENGTH = 4000; // Telegram message limit is 4096; cap a bit lower to leave room for footer.
 
 export const appRouter = router({
   // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -572,6 +598,15 @@ export const appRouter = router({
         if (!isDashboardTokenValid(input.token)) {
           return { error: "Unauthorized" } as const;
         }
+
+        // Reject any key not on the allowlist — settings are user-controlled
+        // text rendered into Telegram messages, so we don't want arbitrary
+        // keys to bloat the table or be set by a stolen dashboard token.
+        if (!TELEGRAM_SETTING_ALLOWLIST.has(input.key)) {
+          log.warn("dashboard.updateSetting", "rejected_unknown_key", { key: input.key });
+          return { success: false, error: "Unknown setting key." } as const;
+        }
+
         if (input.key === TELEGRAM_GROUP_URL_SETTING_KEY) {
           const validation = validateTelegramGroupUrl(input.value);
           if (!validation.ok) {
@@ -583,9 +618,84 @@ export const appRouter = router({
           await syncTelegramGroupUrlContent(validation.value);
           return { success: true } as const;
         }
-        await upsertSetting(input.key, input.value);
-        return { success: true } as const;
+
+        if (TELEGRAM_MESSAGE_SETTING_KEYS.has(input.key)) {
+          const trimmed = input.value.trim();
+          if (!trimmed) {
+            return { success: false, error: "Message must not be empty." } as const;
+          }
+          if (trimmed.length > TELEGRAM_MESSAGE_MAX_LENGTH) {
+            return {
+              success: false,
+              error: `Message too long (max ${TELEGRAM_MESSAGE_MAX_LENGTH} characters).`,
+            } as const;
+          }
+          await upsertSetting(input.key, trimmed);
+          return { success: true } as const;
+        }
+
+        if (TELEGRAM_DELAY_SETTING_KEYS.has(input.key)) {
+          const parsed = Number(input.value);
+          if (!isValidReminderDelayMinutes(parsed)) {
+            return {
+              success: false,
+              error: `Delay must be an integer between ${TELEGRAM_REMINDER_DELAY_BOUNDS.min} and ${TELEGRAM_REMINDER_DELAY_BOUNDS.max} minutes.`,
+            } as const;
+          }
+          await upsertSetting(input.key, String(Math.floor(parsed)));
+          return { success: true } as const;
+        }
+
+        // Defensive — should be unreachable given the allowlist gate above.
+        return { success: false, error: "Setting not handled." } as const;
       }),
+    telegramSettings: publicProcedure.input(dashboardAuthInput).query(async ({ input }) => {
+      if (!isDashboardTokenValid(input.token)) {
+        return { error: "Unauthorized" } as const;
+      }
+
+      const groupUrl = await getTelegramGroupUrl();
+      const [welcomeStored, ...reminderEntries] = await Promise.all([
+        getSetting(WELCOME_MESSAGE_SETTING_KEY),
+        ...TELEGRAM_REMINDER_STEPS.map(async (step) => {
+          const [storedTemplate, storedDelay] = await Promise.all([
+            getSetting(step.settingKey),
+            getSetting(step.delaySettingKey),
+          ]);
+          const delayMinNum = Number(storedDelay);
+          const delayMin =
+            storedDelay && isValidReminderDelayMinutes(delayMinNum)
+              ? Math.floor(delayMinNum)
+              : step.defaultDelayMin;
+          return {
+            key: step.key,
+            label: step.label,
+            description: step.description,
+            messageSettingKey: step.settingKey,
+            delaySettingKey: step.delaySettingKey,
+            defaultDelayMin: step.defaultDelayMin,
+            delayMin,
+            message: storedTemplate || step.defaultTemplate,
+            usesDefaultMessage: !storedTemplate,
+            usesDefaultDelay: !storedDelay,
+          };
+        }),
+      ]);
+
+      return {
+        groupUrl,
+        welcome: {
+          settingKey: WELCOME_MESSAGE_SETTING_KEY,
+          message: welcomeStored || buildDefaultWelcomeMessage(groupUrl),
+          usesDefault: !welcomeStored,
+          variables: ["{firstName}", "{groupLink}", "{group_url}"],
+          description: "Sent when a user runs /start. Variables: {firstName}, {groupLink}.",
+        },
+        reminders: reminderEntries,
+        delayBounds: TELEGRAM_REMINDER_DELAY_BOUNDS,
+        messageMaxLength: TELEGRAM_MESSAGE_MAX_LENGTH,
+      } as const;
+    }),
     today: publicProcedure.input(dashboardAuthInput).query(async ({ input }) => {
       if (!isDashboardTokenValid(input.token)) {
         return { error: "Unauthorized" } as const;

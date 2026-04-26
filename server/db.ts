@@ -1241,6 +1241,8 @@ export async function getRecentBotStartsWithMetaStatus(limit = 50) {
 
   // Subscribe now fires on /start (eventScope='telegram_start'); fall back
   // to 'telegram_join' for legacy rows still on the old code path.
+  // sentReminders is a comma-separated list of reminderKey values (e.g.
+  // "15m,1h,4h") so the dashboard can render reminder-progression dots.
   const [rows]: any = await db.execute(sql`
     SELECT
       bs.id,
@@ -1263,7 +1265,13 @@ export async function getRecentBotStartsWithMetaStatus(limit = 50) {
       mel.eventScope AS metaSubscribeScope,
       bs.attributionStatus,
       bs.startedAt,
-      bs.joinedAt
+      bs.joinedAt,
+      (
+        SELECT GROUP_CONCAT(trj.reminderKey ORDER BY trj.dueAt ASC SEPARATOR ',')
+        FROM telegram_reminder_jobs trj
+        WHERE trj.telegramUserId = bs.telegramUserId
+          AND trj.status = 'sent'
+      ) AS sentReminders
     FROM bot_starts bs
     LEFT JOIN utm_sessions us ON us.sessionToken = bs.sessionToken
     LEFT JOIN meta_event_logs mel
@@ -1295,6 +1303,7 @@ export async function getRecentBotStartsWithMetaStatus(limit = 50) {
     metaSubscribeScope: string | null;
     startedAt: Date;
     joinedAt: Date | null;
+    sentReminders: string | null;
   }>;
 }
 

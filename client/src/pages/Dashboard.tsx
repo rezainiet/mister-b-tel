@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { getFreshnessTone, getStatusHeadline, minutesSince } from "@shared/dashboard";
+import { TelegramMessagesEditor } from "@/components/TelegramMessagesEditor";
 
 type DashboardPreset = "24h" | "48h" | "7d" | "15d" | "30d";
 
@@ -166,7 +167,37 @@ type SubscriberLogRow = {
   metaSubscribeScope: string | null;
   startedAt: string | Date;
   joinedAt: string | Date | null;
+  sentReminders: string | null;
 };
+
+const REMINDER_KEY_ORDER = ["15m", "1h", "4h", "24h", "1w", "2w", "1m"] as const;
+const REMINDER_KEY_TO_INDEX = new Map<string, number>(REMINDER_KEY_ORDER.map((key, index) => [key, index + 1]));
+
+function ReminderProgressionDots({ sentReminders }: { sentReminders: string | null }) {
+  const sentSet = new Set((sentReminders || "").split(",").map((value) => value.trim()).filter(Boolean));
+
+  return (
+    <div className="flex items-center gap-1">
+      {REMINDER_KEY_ORDER.map((key) => {
+        const sent = sentSet.has(key);
+        const index = REMINDER_KEY_TO_INDEX.get(key);
+        return (
+          <span
+            key={key}
+            title={`Reminder ${index} (${key})${sent ? " — sent" : " — not sent"}`}
+            className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold transition ${
+              sent
+                ? "bg-emerald-500/25 text-emerald-200 ring-1 ring-emerald-400/40"
+                : "bg-slate-800 text-slate-500 ring-1 ring-slate-700"
+            }`}
+          >
+            {index}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 type SubscriberLogData = {
   rows: SubscriberLogRow[];
@@ -458,6 +489,10 @@ const SubscriberConversionRow = memo(function SubscriberConversionRow({ row }: {
           <p className="uppercase tracking-[0.16em] text-slate-500">Event ID</p>
           <p className="mt-1 truncate text-sm text-slate-200">{row.metaSubscribeEventId || "—"}</p>
         </div>
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3 border-t border-slate-800 pt-3">
+        <span className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Reminders</span>
+        <ReminderProgressionDots sentReminders={row.sentReminders} />
       </div>
     </div>
   );
@@ -1196,6 +1231,8 @@ export default function Dashboard() {
                 </table>
               </div>
             </Card>
+
+            <TelegramMessagesEditor token={token} />
 
             <Card className="lg:col-span-12">
               <div className="flex items-center gap-2 text-amber-300">
