@@ -1209,6 +1209,9 @@ export async function getMetaEventSummary() {
     };
   }
 
+  // Subscribe now fires on /start (eventScope='telegram_start'); the legacy
+  // 'telegram_join' scope is kept so historical rows (before the conversion
+  // moment was moved) still count toward the dashboard totals.
   const [rows]: any = await db.execute(sql`
     SELECT
       COUNT(*) AS totalStarts,
@@ -1220,7 +1223,7 @@ export async function getMetaEventSummary() {
       COALESCE(SUM(CASE WHEN status IN ('failed', 'abandoned') AND DATE(createdAt) = CURRENT_DATE() THEN 1 ELSE 0 END), 0) AS todayFailed,
       COALESCE(SUM(CASE WHEN status IN ('queued', 'retrying') AND DATE(createdAt) = CURRENT_DATE() THEN 1 ELSE 0 END), 0) AS todayPending
     FROM meta_event_logs
-    WHERE eventScope = 'telegram_join'
+    WHERE eventScope IN ('telegram_start', 'telegram_join')
   `);
 
   return {
