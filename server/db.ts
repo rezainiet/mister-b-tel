@@ -1220,6 +1220,8 @@ export async function getRecentBotStartsWithMetaStatus(limit = 50) {
   const db = await getDb();
   if (!db) return [];
 
+  // Subscribe now fires on /start (eventScope='telegram_start'); fall back
+  // to 'telegram_join' for legacy rows still on the old code path.
   const [rows]: any = await db.execute(sql`
     SELECT
       bs.id,
@@ -1234,15 +1236,20 @@ export async function getRecentBotStartsWithMetaStatus(limit = 50) {
       NULLIF(bs.sessionToken, '') AS sessionToken,
       NULLIF(bs.funnelToken, '') AS funnelToken,
       COALESCE(NULLIF(bs.fbclid, ''), NULLIF(us.fbclid, '')) AS fbclid,
+      NULLIF(us.ipAddress, '') AS ipAddress,
+      NULLIF(us.userAgent, '') AS userAgent,
       COALESCE(mel.status, bs.metaSubscribeStatus, 'pending') AS metaSubscribeStatus,
       COALESCE(mel.eventId, bs.metaSubscribeEventId) AS metaSubscribeEventId,
       COALESCE(mel.completedAt, bs.metaSubscribeSentAt) AS metaSubscribeSentAt,
+      mel.eventScope AS metaSubscribeScope,
       bs.attributionStatus,
       bs.startedAt,
       bs.joinedAt
     FROM bot_starts bs
     LEFT JOIN utm_sessions us ON us.sessionToken = bs.sessionToken
-    LEFT JOIN meta_event_logs mel ON mel.telegramUserId = bs.telegramUserId AND mel.eventScope = 'telegram_join'
+    LEFT JOIN meta_event_logs mel
+      ON mel.telegramUserId = bs.telegramUserId
+      AND mel.eventScope IN ('telegram_start', 'telegram_join')
     ORDER BY bs.startedAt DESC
     LIMIT ${limit}
   `);
@@ -1260,10 +1267,13 @@ export async function getRecentBotStartsWithMetaStatus(limit = 50) {
     sessionToken: string | null;
     funnelToken: string | null;
     fbclid: string | null;
+    ipAddress: string | null;
+    userAgent: string | null;
     attributionStatus: string | null;
     metaSubscribeStatus: "queued" | "retrying" | "pending" | "sent" | "failed" | "abandoned";
     metaSubscribeEventId: string | null;
     metaSubscribeSentAt: Date | null;
+    metaSubscribeScope: string | null;
     startedAt: Date;
     joinedAt: Date | null;
   }>;

@@ -158,9 +158,12 @@ type SubscriberLogRow = {
   utmTerm: string;
   sessionToken: string | null;
   fbclid: string | null;
-  metaSubscribeStatus: "pending" | "sent" | "failed";
+  ipAddress: string | null;
+  userAgent: string | null;
+  metaSubscribeStatus: "pending" | "sent" | "failed" | "queued" | "retrying" | "abandoned";
   metaSubscribeEventId: string | null;
   metaSubscribeSentAt: string | Date | null;
+  metaSubscribeScope: string | null;
   startedAt: string | Date;
   joinedAt: string | Date | null;
 };
@@ -1113,7 +1116,7 @@ export default function Dashboard() {
                             <span className={`h-2 w-2 rounded-full ${metaBadge.dot}`} /> {metaBadge.label}
                           </span>
                         </div>
-                        <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-400 sm:grid-cols-5">
+                        <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-400 sm:grid-cols-3 lg:grid-cols-6">
                           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
                             <p className="uppercase tracking-[0.16em] text-slate-500">Start bot</p>
                             <p className="mt-1 text-sm text-slate-200">{formatRelativeTime(row.startedAt)}</p>
@@ -1125,6 +1128,12 @@ export default function Dashboard() {
                           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
                             <p className="uppercase tracking-[0.16em] text-slate-500">Meta</p>
                             <p className="mt-1 text-sm text-slate-200">{metaBadge.label}</p>
+                          </div>
+                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
+                            <p className="uppercase tracking-[0.16em] text-slate-500">IP</p>
+                            <p className="mt-1 truncate font-mono text-sm text-slate-200" title={row.ipAddress || ""}>
+                              {row.ipAddress || "—"}
+                            </p>
                           </div>
                           <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
                             <p className="uppercase tracking-[0.16em] text-slate-500">Session token</p>
