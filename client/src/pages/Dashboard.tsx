@@ -15,14 +15,23 @@ import {
   ArrowLeft,
   CalendarDays,
   ChevronDown,
+  ChevronsDown,
   Clock3,
+  Eye,
+  Gauge,
   Loader2,
   LockKeyhole,
+  MessageCircle,
+  MousePointerClick,
+  Power,
   Radio,
   RefreshCcw,
   ShieldCheck,
   TrendingUp,
+  UserPlus,
+  Users,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { getFreshnessTone, getStatusHeadline, minutesSince } from "@shared/dashboard";
 import { TelegramMessagesEditor } from "@/components/TelegramMessagesEditor";
@@ -289,17 +298,48 @@ function eventDotClass(eventType: string, eventSource?: string | null) {
   return "bg-violet-400";
 }
 
-function kpiColorClass(kind: "violet" | "cyan" | "green" | "blue" | "yellow") {
-  const map = {
-    violet: "text-violet-400",
-    cyan: "text-cyan-400",
-    green: "text-emerald-400",
-    blue: "text-blue-400",
-    yellow: "text-amber-300",
-  } as const;
+type MetricColor = "violet" | "cyan" | "green" | "blue" | "yellow";
 
-  return map[kind];
-}
+const METRIC_PALETTE: Record<
+  MetricColor,
+  {
+    valueGradient: string;
+    iconRing: string;
+    iconText: string;
+    cardGlow: string;
+  }
+> = {
+  violet: {
+    valueGradient: "from-violet-300 via-violet-400 to-fuchsia-400",
+    iconRing: "bg-violet-500/15 ring-violet-400/30",
+    iconText: "text-violet-300",
+    cardGlow: "hover:border-violet-500/30 hover:shadow-[0_0_22px_rgba(168,85,247,0.10)]",
+  },
+  cyan: {
+    valueGradient: "from-cyan-300 via-cyan-400 to-sky-400",
+    iconRing: "bg-cyan-500/15 ring-cyan-400/30",
+    iconText: "text-cyan-300",
+    cardGlow: "hover:border-cyan-500/30 hover:shadow-[0_0_22px_rgba(34,211,238,0.10)]",
+  },
+  green: {
+    valueGradient: "from-emerald-300 via-emerald-400 to-teal-400",
+    iconRing: "bg-emerald-500/15 ring-emerald-400/30",
+    iconText: "text-emerald-300",
+    cardGlow: "hover:border-emerald-500/30 hover:shadow-[0_0_22px_rgba(34,197,94,0.10)]",
+  },
+  blue: {
+    valueGradient: "from-blue-300 via-blue-400 to-indigo-400",
+    iconRing: "bg-blue-500/15 ring-blue-400/30",
+    iconText: "text-blue-300",
+    cardGlow: "hover:border-blue-500/30 hover:shadow-[0_0_22px_rgba(59,130,246,0.10)]",
+  },
+  yellow: {
+    valueGradient: "from-amber-200 via-amber-300 to-orange-400",
+    iconRing: "bg-amber-400/15 ring-amber-300/30",
+    iconText: "text-amber-200",
+    cardGlow: "hover:border-amber-400/30 hover:shadow-[0_0_22px_rgba(245,158,11,0.10)]",
+  },
+};
 
 function metaStatusBadge(status: SubscriberLogRow["metaSubscribeStatus"]) {
   if (status === "sent") {
@@ -503,18 +543,39 @@ function MetricCard({
   value,
   subtitle,
   color,
+  icon: Icon,
 }: {
   title: string;
   value: string;
   subtitle: string;
-  color: "violet" | "cyan" | "green" | "blue" | "yellow";
+  color: MetricColor;
+  icon?: LucideIcon;
 }) {
+  const palette = METRIC_PALETTE[color];
+
   return (
-    <Card>
-      <p className="text-[0.72rem] font-medium uppercase tracking-[0.22em] text-slate-400">{title}</p>
-      <p className={`mt-4 text-[2.45rem] font-bold tracking-[-0.06em] ${kpiColorClass(color)}`}>{value}</p>
-      <p className="mt-3 text-sm text-slate-400">{subtitle}</p>
-    </Card>
+    <section
+      className={`group relative flex h-full flex-col overflow-hidden rounded-[20px] border border-slate-800 bg-slate-900/95 p-5 transition duration-200 ${palette.cardGlow}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-[0.66rem] font-semibold uppercase tracking-[0.20em] text-slate-400">
+          {title}
+        </p>
+        {Icon ? (
+          <span
+            className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ring-1 ${palette.iconRing} ${palette.iconText}`}
+          >
+            <Icon className="h-4 w-4" />
+          </span>
+        ) : null}
+      </div>
+      <p
+        className={`mt-3 bg-gradient-to-br bg-clip-text text-[2.1rem] font-bold leading-none tracking-[-0.05em] text-transparent ${palette.valueGradient}`}
+      >
+        {value}
+      </p>
+      <p className="mt-auto pt-3 text-xs leading-snug text-slate-400">{subtitle}</p>
+    </section>
   );
 }
 
@@ -1052,22 +1113,24 @@ export default function Dashboard() {
                 <p className="mt-1 text-sm text-slate-300">{data.live.adStatusLabel}</p>
               </div>
 
-              <div className="mt-6 grid grid-cols-3 gap-4">
-                <div>
-                  <p className="text-[1.95rem] font-bold tracking-[-0.05em] text-emerald-400">
+              <div className="mt-6 grid grid-cols-3 gap-3 sm:gap-4">
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-950/40 px-3 py-3">
+                  <p className="text-[1.5rem] font-bold leading-none tracking-[-0.05em] text-emerald-400 sm:text-[1.95rem]">
                     {formatInt(data.live.last5Minutes.pageviews)}
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">visits (5 min)</p>
+                  <p className="mt-2 text-[0.65rem] uppercase tracking-[0.14em] text-slate-400">5 min</p>
                 </div>
-                <div>
-                  <p className="text-[1.95rem] font-bold tracking-[-0.05em] text-emerald-400">
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-950/40 px-3 py-3">
+                  <p className="text-[1.5rem] font-bold leading-none tracking-[-0.05em] text-emerald-400 sm:text-[1.95rem]">
                     {formatInt(data.live.last4Hours.pageviews)}
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">visits (4h)</p>
+                  <p className="mt-2 text-[0.65rem] uppercase tracking-[0.14em] text-slate-400">4 h</p>
                 </div>
-                <div>
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Last visit</p>
-                  <p className="mt-2 text-base font-semibold text-white">{formatRelativeTime(data.live.lastVisitAt)}</p>
+                <div className="rounded-2xl border border-slate-800/60 bg-slate-950/40 px-3 py-3">
+                  <p className="text-[0.65rem] uppercase tracking-[0.14em] text-slate-400">Last visit</p>
+                  <p className="mt-2 truncate text-sm font-semibold text-white">
+                    {formatRelativeTime(data.live.lastVisitAt)}
+                  </p>
                 </div>
               </div>
 
@@ -1087,73 +1150,88 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <MetricCard
-              title="Vues landing"
-              value={formatInt(data.totals.pageviews)}
-              subtitle="Pages vues sur la période"
-              color="violet"
-            />
-            <MetricCard
-              title="Visiteurs uniques"
-              value={formatInt(data.totals.uniqueVisitors)}
-              subtitle="Personnes différentes"
-              color="cyan"
-            />
-            <MetricCard
-              title="Clic bot Telegram"
-              value={formatInt(botClicks)}
-              subtitle="Clic sur le bouton canal / bot"
-              color="green"
-            />
-            <MetricCard
-              title="Start bot"
-              value={formatInt(botStarts)}
-              subtitle="Utilisateurs ayant lancé /start"
-              color="blue"
-            />
-            <MetricCard
-              title="Membres rejoints"
-              value={formatInt(membersJoined)}
-              subtitle="Bot start puis ajout confirmé"
-              color="green"
-            />
-            <MetricCard
-              title="Contact direct"
-              value={formatInt(directContactClicks)}
-              subtitle="Clic vers le contact privé"
-              color="cyan"
-            />
-            <MetricCard
-              title="Taux bot → membre"
-              value={botToMemberRate}
-              subtitle={`${formatInt(pendingAfterStart)} start(s) sans ajout confirmé`}
-              color="yellow"
-            />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:col-span-12 lg:grid-cols-4 xl:grid-cols-7">
+              <MetricCard
+                title="Vues landing"
+                value={formatInt(data.totals.pageviews)}
+                subtitle="Pages vues sur la période"
+                color="violet"
+                icon={Eye}
+              />
+              <MetricCard
+                title="Visiteurs uniques"
+                value={formatInt(data.totals.uniqueVisitors)}
+                subtitle="Personnes différentes"
+                color="cyan"
+                icon={Users}
+              />
+              <MetricCard
+                title="Clic bot Telegram"
+                value={formatInt(botClicks)}
+                subtitle="Clic sur le bouton canal / bot"
+                color="green"
+                icon={MousePointerClick}
+              />
+              <MetricCard
+                title="Start bot"
+                value={formatInt(botStarts)}
+                subtitle="Utilisateurs ayant lancé /start"
+                color="blue"
+                icon={Power}
+              />
+              <MetricCard
+                title="Membres rejoints"
+                value={formatInt(membersJoined)}
+                subtitle="Bot start puis ajout confirmé"
+                color="green"
+                icon={UserPlus}
+              />
+              <MetricCard
+                title="Contact direct"
+                value={formatInt(directContactClicks)}
+                subtitle="Clic vers le contact privé"
+                color="cyan"
+                icon={MessageCircle}
+              />
+              <MetricCard
+                title="Taux bot → membre"
+                value={botToMemberRate}
+                subtitle={`${formatInt(pendingAfterStart)} start(s) sans ajout confirmé`}
+                color="yellow"
+                icon={Gauge}
+              />
+            </div>
 
-            <MetricCard
-              title="Scroll 25%"
-              value={formatInt(data.totals.scroll25)}
-              subtitle="Saw the beginning"
-              color="violet"
-            />
-            <MetricCard
-              title="Scroll 50%"
-              value={formatInt(data.totals.scroll50)}
-              subtitle="Saw half"
-              color="violet"
-            />
-            <MetricCard
-              title="Scroll 75%"
-              value={formatInt(data.totals.scroll75)}
-              subtitle="Saw almost all"
-              color="violet"
-            />
-            <MetricCard
-              title="Scroll 100%"
-              value={formatInt(data.totals.scroll100)}
-              subtitle="Saw everything"
-              color="violet"
-            />
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:col-span-12">
+              <MetricCard
+                title="Scroll 25%"
+                value={formatInt(data.totals.scroll25)}
+                subtitle="Saw the beginning"
+                color="violet"
+                icon={ChevronsDown}
+              />
+              <MetricCard
+                title="Scroll 50%"
+                value={formatInt(data.totals.scroll50)}
+                subtitle="Saw half"
+                color="violet"
+                icon={ChevronsDown}
+              />
+              <MetricCard
+                title="Scroll 75%"
+                value={formatInt(data.totals.scroll75)}
+                subtitle="Saw almost all"
+                color="violet"
+                icon={ChevronsDown}
+              />
+              <MetricCard
+                title="Scroll 100%"
+                value={formatInt(data.totals.scroll100)}
+                subtitle="Saw everything"
+                color="violet"
+                icon={ChevronsDown}
+              />
+            </div>
 
             <Card className="lg:col-span-8">
               <div className="flex items-center gap-2 text-amber-300">
@@ -1198,26 +1276,76 @@ export default function Dashboard() {
                 <CalendarDays className="h-4 w-4" />
                 <h3 className="text-lg font-semibold tracking-[-0.03em]">Daily Breakdown</h3>
               </div>
-              <div className="mt-4 overflow-x-auto">
-                <table className="min-w-full text-left text-sm">
+
+              {/* Mobile: stacked card list. Easier to scan on narrow viewports
+                  than a horizontal-scroll table. */}
+              <div className="mt-4 space-y-2 sm:hidden">
+                {data.daily.length > 0 ? (
+                  data.daily.map((day) => (
+                    <div
+                      key={day.date}
+                      className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3"
+                    >
+                      <p className="text-xs font-medium text-slate-300">{day.date}</p>
+                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+                        <span className="text-slate-500">Visits</span>
+                        <span className="text-right font-semibold text-violet-300">
+                          {formatInt(day.pageviews)}
+                        </span>
+                        <span className="text-slate-500">Unique Visitors</span>
+                        <span className="text-right font-semibold text-cyan-300">
+                          {formatInt(day.uniqueVisitors)}
+                        </span>
+                        <span className="text-slate-500">Clic bot</span>
+                        <span className="text-right font-semibold text-emerald-300">
+                          {formatInt(day.whatsappClicks)}
+                        </span>
+                        <span className="text-slate-500">Contact direct</span>
+                        <span className="text-right font-semibold text-blue-300">
+                          {formatInt(day.telegramClicks)}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-400">Aucune donnée disponible sur cette période.</p>
+                )}
+              </div>
+
+              {/* Tablet+: traditional table, scroll horizontally if narrower
+                  than its content. whitespace-nowrap keeps numbers and headers
+                  on a single line so they never wrap character-by-character. */}
+              <div className="mt-4 hidden overflow-x-auto sm:block">
+                <table className="w-full min-w-[420px] text-left text-sm">
                   <thead>
-                    <tr className="border-b border-slate-700 text-slate-400">
-                      <th className="pb-3 pr-4 font-medium">Date</th>
-                      <th className="pb-3 pr-4 font-medium">Visits</th>
-                      <th className="pb-3 pr-4 font-medium">Unique Visitors</th>
-                      <th className="pb-3 pr-4 font-medium">Clic bot</th>
-                      <th className="pb-3 font-medium">Contact direct</th>
+                    <tr className="border-b border-slate-700 text-[0.7rem] uppercase tracking-[0.14em] text-slate-500">
+                      <th className="whitespace-nowrap pb-3 pr-4 font-medium">Date</th>
+                      <th className="whitespace-nowrap pb-3 pr-4 font-medium">Visits</th>
+                      <th className="whitespace-nowrap pb-3 pr-4 font-medium">Unique Visitors</th>
+                      <th className="whitespace-nowrap pb-3 pr-4 font-medium">Clic bot</th>
+                      <th className="whitespace-nowrap pb-3 font-medium">Contact direct</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.daily.length > 0 ? (
                       data.daily.map((day) => (
-                        <tr key={day.date} className="border-b border-slate-800/80 last:border-b-0">
-                          <td className="py-3 pr-4 text-slate-300">{day.date}</td>
-                          <td className="py-3 pr-4 text-violet-400">{formatInt(day.pageviews)}</td>
-                          <td className="py-3 pr-4 text-cyan-400">{formatInt(day.uniqueVisitors)}</td>
-                          <td className="py-3 pr-4 text-emerald-400">{formatInt(day.whatsappClicks)}</td>
-                          <td className="py-3 text-blue-400">{formatInt(day.telegramClicks)}</td>
+                        <tr
+                          key={day.date}
+                          className="border-b border-slate-800/80 last:border-b-0 transition hover:bg-slate-950/50"
+                        >
+                          <td className="whitespace-nowrap py-3 pr-4 text-slate-300">{day.date}</td>
+                          <td className="whitespace-nowrap py-3 pr-4 font-semibold text-violet-300">
+                            {formatInt(day.pageviews)}
+                          </td>
+                          <td className="whitespace-nowrap py-3 pr-4 font-semibold text-cyan-300">
+                            {formatInt(day.uniqueVisitors)}
+                          </td>
+                          <td className="whitespace-nowrap py-3 pr-4 font-semibold text-emerald-300">
+                            {formatInt(day.whatsappClicks)}
+                          </td>
+                          <td className="whitespace-nowrap py-3 font-semibold text-blue-300">
+                            {formatInt(day.telegramClicks)}
+                          </td>
                         </tr>
                       ))
                     ) : (
