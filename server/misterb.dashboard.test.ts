@@ -11,6 +11,7 @@ vi.mock("./db", () => ({
   updateMetaEventLog: vi.fn().mockResolvedValue(undefined),
   insertUtmSession: vi.fn().mockResolvedValue(undefined),
   markSessionClicked: vi.fn().mockResolvedValue(undefined),
+  getUtmSessionByToken: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("./facebookCapi", () => ({
@@ -303,6 +304,12 @@ describe("Mister B dashboard and tracking routers", () => {
   });
 
   it("records pageviews and forwards them to Meta CAPI PageView", async () => {
+    vi.mocked(sendPageView).mockResolvedValue({
+      success: true,
+      eventId: "pv_456",
+      httpStatus: 200,
+      retryable: false,
+    });
     const caller = appRouter.createCaller(createContext());
 
     await caller.tracking.record({
@@ -327,8 +334,9 @@ describe("Mister B dashboard and tracking routers", () => {
     const caller = appRouter.createCaller(createContext());
 
     let releaseSendPageView: (() => void) | null = null;
-    const sendPageViewDone = new Promise<void>((resolve) => {
-      releaseSendPageView = resolve;
+    const sendPageViewDone = new Promise<Awaited<ReturnType<typeof sendPageView>>>((resolve) => {
+      releaseSendPageView = () =>
+        resolve({ success: true, eventId: "pv_await", httpStatus: 200, retryable: false });
     });
 
     vi.mocked(sendPageView).mockImplementation(() => sendPageViewDone as ReturnType<typeof sendPageView>);

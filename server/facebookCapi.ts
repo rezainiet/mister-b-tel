@@ -14,6 +14,11 @@ export type ConversionPayload = {
   country?: string;
   source?: string;
   customData?: Record<string, unknown>;
+  utmSource?: string;
+  utmMedium?: string;
+  utmCampaign?: string;
+  utmContent?: string;
+  utmTerm?: string;
 };
 
 function hashForFb(value?: string | null) {
@@ -55,9 +60,15 @@ function buildCustomData(eventName: ConversionEventName, payload: ConversionPayl
       : undefined;
   }
 
-  return {
+  const base: Record<string, unknown> = {
     content_name: "Mister B Landing",
   };
+  if (payload.utmSource) base.utm_source = payload.utmSource;
+  if (payload.utmMedium) base.utm_medium = payload.utmMedium;
+  if (payload.utmCampaign) base.utm_campaign = payload.utmCampaign;
+  if (payload.utmContent) base.utm_content = payload.utmContent;
+  if (payload.utmTerm) base.utm_term = payload.utmTerm;
+  return base;
 }
 
 export function buildCapiEventPayload(

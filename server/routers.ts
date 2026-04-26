@@ -38,7 +38,8 @@ import {
   upsertSetting,
 } from "./db";
 import { sendPageView } from "./facebookCapi";
-import { retryStoredMetaRequest } from "./metaCapi";
+import { buildServerFbc, retryStoredMetaRequest } from "./metaCapi";
+import { getUtmSessionByToken } from "./db";
 import { syncTelegramGroupUrlContent, TELEGRAM_GROUP_URL_SETTING_KEY } from "./telegramGroupLink";
 
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || "Misternb_bot";
@@ -203,16 +204,27 @@ export const appRouter = router({
           country: input.country || null,
         });
 
+        // Resolve the matching landing session so we can build server-side fbc
+        // and propagate UTMs into the Meta payload. Without this, ad-driven
+        // PageView attribution to fbclid is lost.
+        const session = input.sessionToken ? await getUtmSessionByToken(input.sessionToken) : undefined;
+        const serverFbc = buildServerFbc(session?.fbclid, session?.createdAt);
+
         const capiPayload = {
           visitorId: input.visitorId,
           eventId: input.eventId,
           eventSourceUrl: sourceUrl,
           userAgent,
           clientIpAddress,
-          fbc: input.fbc,
-          fbp: input.fbp,
+          fbc: input.fbc || serverFbc,
+          fbp: input.fbp || session?.fbp || undefined,
           country: input.country,
           source: input.eventSource || "button",
+          utmSource: session?.utmSource || undefined,
+          utmMedium: session?.utmMedium || undefined,
+          utmCampaign: session?.utmCampaign || undefined,
+          utmContent: session?.utmContent || undefined,
+          utmTerm: session?.utmTerm || undefined,
         };
 
         if (input.eventType === "pageview") {

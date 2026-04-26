@@ -3,6 +3,7 @@ import type { Express, Request, Response } from "express";
 import { log } from "./_core/logger";
 import {
   createMetaEventLog,
+  deleteTelegramUpdateId,
   getAllJoins,
   getBotStartByTelegramUserId,
   getLatestUtmSessionByFunnelToken,
@@ -299,6 +300,7 @@ async function handleNewMember(
       eventTime: Math.floor(date),
       telegramUserId,
       telegramUsername: user.username,
+      visitorId: session?.visitorId || undefined,
       fbclid: session?.fbclid || undefined,
       fbp: session?.fbp || undefined,
       sessionCreatedAt: session?.createdAt,
@@ -358,40 +360,43 @@ export function setupTelegramWebhook(app: Express) {
       return;
     }
 
-    res.json({ ok: true });
-
     const update = req.body as TelegramUpdate;
     const updateId = typeof update?.update_id === "number" ? update.update_id : null;
+
+    // Layer 1: in-memory LRU. Cheap, fast, survives DB outages. Drops only
+    // duplicates we *know* we've seen this process — safe to ack.
     if (updateId !== null) {
-      // Layer 1: in-memory LRU. Cheap, fast, survives DB outages.
       const freshInMemory = rememberUpdateIdInMemory(updateId);
       if (!freshInMemory) {
         log.info("telegramWebhook", "duplicate_update_dropped_memory", { updateId });
+        res.json({ ok: true });
         return;
       }
+    }
 
-      // Layer 2: durable DB dedup. Survives process restarts.
+    // Layer 2: durable DB dedup BEFORE processing. We INSERT-IGNORE and only
+    // proceed if the row was newly created. If the dedup INSERT fails for a
+    // transient reason (deadlock, connection refused), we return 500 so
+    // Telegram retries — better to retry than silently drop.
+    if (updateId !== null) {
       try {
         const freshInDb = await tryRecordTelegramUpdateId(updateId);
         if (!freshInDb) {
           log.info("telegramWebhook", "duplicate_update_dropped_db", { updateId });
+          res.json({ ok: true });
           return;
         }
       } catch (error) {
         const code = (error as { errno?: number; code?: string })?.errno;
-        // ER_NO_SUCH_TABLE = 1146 → migration 0007 not applied yet. Don't fail
-        // the whole bot; the in-memory LRU above is still active.
         if (code === 1146) {
+          // Migration 0007 not applied yet — degrade gracefully, in-memory LRU is still active.
           log.warn("telegramWebhook", "dedup_table_missing_run_migration_0007", { updateId });
         } else {
-          // Any other error (deadlock, lock timeout, connection refused) means
-          // we can't be sure the row is fresh. Fail CLOSED — better to drop a
-          // legitimate update (Telegram retries) than double-process and emit
-          // duplicate Subscribe events to Meta.
-          log.error("telegramWebhook", "dedup_failed_closed", {
+          log.error("telegramWebhook", "dedup_failed_retryable", {
             updateId,
             error: error instanceof Error ? error.message : String(error),
           });
+          res.status(500).json({ ok: false, error: "dedup_failed" });
           return;
         }
       }
@@ -399,12 +404,27 @@ export function setupTelegramWebhook(app: Express) {
 
     try {
       await processTelegramUpdate(req, update);
+      res.json({ ok: true });
     } catch (error) {
-      log.error("telegramWebhook", "unhandled_processing_error", {
+      log.error("telegramWebhook", "processing_failed_will_retry", {
         updateId,
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
+      // The dedup row was already inserted, so a Telegram retry would skip
+      // processing. Roll it back so the retry can re-process.
+      if (updateId !== null) {
+        try {
+          await deleteTelegramUpdateId(updateId);
+        } catch (rollbackError) {
+          log.error("telegramWebhook", "dedup_rollback_failed", {
+            updateId,
+            error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+          });
+        }
+        recentUpdateIds.delete(updateId);
+      }
+      res.status(500).json({ ok: false, error: "processing_failed" });
     }
   });
 

@@ -1409,6 +1409,13 @@ export async function tryRecordTelegramUpdateId(updateId: number): Promise<boole
   }
 }
 
+export async function deleteTelegramUpdateId(updateId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  if (!Number.isFinite(updateId)) return;
+  await db.delete(telegramUpdateLog).where(eq(telegramUpdateLog.updateId, updateId));
+}
+
 export async function updateTelegramJoinMetaStatusByEventId(
   eventId: string,
   status: "pending" | "sent" | "failed" | "retrying" | "abandoned",

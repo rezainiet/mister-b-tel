@@ -179,6 +179,7 @@ export interface CapiEventData {
   eventTime: number;
   telegramUserId: string;
   telegramUsername?: string;
+  visitorId?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
   fbclid?: string;
@@ -193,8 +194,14 @@ export interface CapiEventData {
 }
 
 export function buildSubscribePayload(data: CapiEventData) {
+  // Prefer the landing-page visitorId for external_id so PageView and
+  // Subscribe share the same identifier — Meta's cross-event funnel needs
+  // this to attribute the join back to the original ad-driven visit.
+  // Fall back to telegramUserId for organic /start flows where no session
+  // was ever created.
+  const externalIdSource = data.visitorId || String(data.telegramUserId);
   const userData: Record<string, string> = {
-    external_id: hashValue(String(data.telegramUserId)),
+    external_id: hashValue(externalIdSource),
   };
 
   if (data.ipAddress) userData.client_ip_address = data.ipAddress;
@@ -210,6 +217,7 @@ export function buildSubscribePayload(data: CapiEventData) {
     value: "0.00",
     currency: "EUR",
     predicted_ltv: "0.00",
+    telegram_user_id: String(data.telegramUserId),
   };
 
   if (data.utmCampaign) customData.utm_campaign = data.utmCampaign;
