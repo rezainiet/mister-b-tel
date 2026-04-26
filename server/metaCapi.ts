@@ -87,6 +87,11 @@ export async function postMetaPayload(
     };
   }
 
+  const envTestCode = process.env.META_TEST_EVENT_CODE;
+  if (envTestCode && !payload.test_event_code) {
+    payload.test_event_code = envTestCode;
+  }
+
   try {
     const response = await fetch(`${CAPI_URL}?access_token=${ACCESS_TOKEN}`, {
       method: "POST",
