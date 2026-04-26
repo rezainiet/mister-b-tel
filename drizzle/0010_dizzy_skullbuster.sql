@@ -1,0 +1,1 @@
+ALTER TABLE `daily_stats` ADD CONSTRAINT `daily_stats_date_unique` UNIQUE(`date`);
