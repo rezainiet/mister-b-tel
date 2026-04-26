@@ -661,65 +661,66 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-[#0b1120] text-white">
-      <div className="mx-auto max-w-md px-4 py-5 sm:px-6 sm:py-6">
-        <header className="mb-4 rounded-[24px] border border-slate-800 bg-slate-900/95 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-[1.6rem] font-bold tracking-[-0.05em] text-amber-300">Mister B Tracker</h1>
-              <p className="mt-1 text-sm text-slate-400">mister-b · Real-time Dashboard</p>
+      <div className="mx-auto w-full max-w-md px-4 py-5 sm:max-w-2xl sm:px-6 sm:py-6 lg:max-w-7xl lg:px-8 lg:py-8">
+        <header className="mb-4 rounded-[24px] border border-slate-800 bg-slate-900/95 p-5 lg:mb-6 lg:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start justify-between gap-4 lg:items-center">
+              <div>
+                <h1 className="text-[1.6rem] font-bold tracking-[-0.05em] text-amber-300 lg:text-3xl">Mister B Tracker</h1>
+                <p className="mt-1 text-sm text-slate-400">mister-b · Real-time Dashboard</p>
+              </div>
+              <div className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200 lg:hidden">
+                <span className="text-base">🇫🇷</span>
+                <span>FR</span>
+              </div>
             </div>
-            <div className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm text-slate-200">
-              <span className="text-base">🇫🇷</span>
-              <span>FR</span>
-            </div>
-          </div>
 
-          <div className="mt-4 grid grid-cols-[1fr_auto] gap-3">
-            <label className="relative">
-              <select
-                value={preset}
-                onChange={(event) => setPreset(event.target.value as DashboardPreset)}
-                className="h-11 w-full appearance-none rounded-xl border border-slate-700 bg-slate-950 px-4 pr-10 text-sm text-white outline-none transition focus:border-emerald-400"
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch lg:gap-2">
+              <label className="relative flex-1 sm:max-w-[16rem]">
+                <select
+                  value={preset}
+                  onChange={(event) => setPreset(event.target.value as DashboardPreset)}
+                  className="h-11 w-full appearance-none rounded-xl border border-slate-700 bg-slate-950 px-4 pr-10 text-sm text-white outline-none transition focus:border-emerald-400"
+                >
+                  {presetOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </label>
+              <button
+                type="button"
+                onClick={() =>
+                  void Promise.all([
+                    statsQuery.refetch(),
+                    metaStatusQuery.refetch(),
+                    subscriberLogQuery.refetch(),
+                    telegramOverviewQuery.refetch(),
+                  ])
+                }
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-4 text-sm font-medium text-slate-200 transition hover:border-slate-500"
               >
-                {presetOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            </label>
-            <button
-              type="button"
-              onClick={() =>
-                void Promise.all([
-                  statsQuery.refetch(),
-                  metaStatusQuery.refetch(),
-                  subscriberLogQuery.refetch(),
-                  telegramOverviewQuery.refetch(),
-                ])
-              }
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-4 text-sm font-medium text-slate-200 transition hover:border-slate-500"
-            >
-              <RefreshCcw
-                className={`h-4 w-4 ${
-                  statsQuery.isFetching || metaStatusQuery.isFetching || subscriberLogQuery.isFetching
-                    ? "animate-spin"
-                    : ""
-                }`}
-              /> Refresh
-            </button>
+                <RefreshCcw
+                  className={`h-4 w-4 ${
+                    statsQuery.isFetching || metaStatusQuery.isFetching || subscriberLogQuery.isFetching
+                      ? "animate-spin"
+                      : ""
+                  }`}
+                /> Refresh
+              </button>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-red-500/55 px-4 text-sm font-medium text-red-400 transition hover:bg-red-500/10"
+              >
+                <LockKeyhole className="h-4 w-4" /> Logout
+              </button>
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-red-500/55 px-4 text-sm font-medium text-red-400 transition hover:bg-red-500/10"
-          >
-            <LockKeyhole className="h-4 w-4" /> Logout
-          </button>
-
-          <div className="mt-4 grid gap-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:mt-5 lg:grid-cols-3">
             <StatusPill
               dotClass="bg-emerald-400"
               label="Lecture live"
@@ -749,8 +750,8 @@ export default function Dashboard() {
             </div>
           </div>
         ) : data ? (
-          <div className="space-y-4">
-            <Card>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6">
+            <Card className="lg:col-span-4">
               <div className="flex items-center gap-2 text-amber-300">
                 <LockKeyhole className="h-4 w-4" />
                 <h3 className="text-lg font-semibold tracking-[-0.03em]">Telegram link editor</h3>
@@ -789,7 +790,7 @@ export default function Dashboard() {
                 </button>
               </div>
             </Card>
-            <Card className="border-violet-500/40 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.16),transparent_42%),#111827] shadow-[0_0_0_1px_rgba(168,85,247,0.10),0_0_30px_rgba(59,130,246,0.08)]">
+            <Card className="lg:col-span-8 border-violet-500/40 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.16),transparent_42%),#111827] shadow-[0_0_0_1px_rgba(168,85,247,0.10),0_0_30px_rgba(59,130,246,0.08)]">
               <div className="flex items-center gap-2 text-amber-300">
                 <ShieldCheck className="h-4 w-4" />
                 <h3 className="text-lg font-semibold tracking-[-0.03em]">Meta Server Status</h3>
@@ -858,7 +859,7 @@ export default function Dashboard() {
                 </div>
               </div>
             </Card>
-            <Card className="border-emerald-500/50 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.18),transparent_38%),#111827] shadow-[0_0_0_1px_rgba(34,197,94,0.12),0_0_34px_rgba(34,197,94,0.10)]">
+            <Card className="lg:col-span-4 border-emerald-500/50 bg-[radial-gradient(circle_at_top_left,rgba(34,197,94,0.18),transparent_38%),#111827] shadow-[0_0_0_1px_rgba(34,197,94,0.12),0_0_34px_rgba(34,197,94,0.10)]">
               <div className="flex items-center gap-2 text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-slate-400">
                 <span className="h-3 w-3 rounded-full bg-emerald-400 shadow-[0_0_18px_rgba(74,222,128,0.95)]" />
                 AD STATUS
@@ -973,7 +974,7 @@ export default function Dashboard() {
               color="violet"
             />
 
-            <Card>
+            <Card className="lg:col-span-8">
               <div className="flex items-center gap-2 text-amber-300">
                 <TrendingUp className="h-4 w-4" />
                 <h3 className="text-lg font-semibold tracking-[-0.03em]">Daily Traffic</h3>
@@ -1011,7 +1012,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card>
+            <Card className="lg:col-span-4">
               <div className="flex items-center gap-2 text-amber-300">
                 <CalendarDays className="h-4 w-4" />
                 <h3 className="text-lg font-semibold tracking-[-0.03em]">Daily Breakdown</h3>
@@ -1050,7 +1051,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card>
+            <Card className="lg:col-span-12">
               <div className="flex items-center gap-2 text-amber-300">
                 <Radio className="h-4 w-4 text-red-400" />
                 <h3 className="text-lg font-semibold tracking-[-0.03em]">Recent Events</h3>
@@ -1081,7 +1082,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card className="border-cyan-500/35 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_38%),#111827] shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_0_30px_rgba(34,211,238,0.08)]">
+            <Card className="lg:col-span-12 border-cyan-500/35 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.14),transparent_38%),#111827] shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_0_30px_rgba(34,211,238,0.08)]">
               <div className="flex items-center gap-2 text-amber-300">
                 <Radio className="h-4 w-4 text-cyan-400" />
                 <h3 className="text-lg font-semibold tracking-[-0.03em]">Derniers starts bot</h3>
@@ -1157,7 +1158,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card>
+            <Card className="lg:col-span-12">
               <div className="flex items-center gap-2 text-amber-300">
                 <Radio className="h-4 w-4 text-violet-400" />
                 <h3 className="text-lg font-semibold tracking-[-0.03em]">Qui a start / qui a rejoint</h3>
@@ -1196,7 +1197,7 @@ export default function Dashboard() {
                             <span className={`h-2 w-2 rounded-full ${badge.dot}`} /> {badge.label}
                           </span>
                         </div>
-                        <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-400 sm:grid-cols-5">
+                        <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-400 sm:grid-cols-3 lg:grid-cols-5">
                           <div>
                             <p className="uppercase tracking-[0.16em] text-slate-500">Start bot</p>
                             <p className="mt-1 text-sm text-slate-200">{formatDateTime(row.startedAt)}</p>
