@@ -817,14 +817,38 @@ export default function Dashboard() {
                   value={metaStatus?.config.tokenConfigured ? "Configured" : "Missing"}
                 />
                 <StatusPill
-                  dotClass={metaStatus?.config.pageViewTrackingActive ? "bg-cyan-400" : "bg-amber-300"}
+                  dotClass={
+                    metaStatus?.config.pageViewTrackingActive
+                      ? "bg-cyan-400"
+                      : metaStatus?.config.pixelConfigured && metaStatus?.config.tokenConfigured
+                        ? "bg-slate-500"
+                        : "bg-red-400"
+                  }
                   label="PageView"
-                  value={metaStatus?.config.pageViewTrackingActive ? "Server-side active" : "Waiting for credentials"}
+                  value={
+                    metaStatus?.config.pageViewTrackingActive
+                      ? "Server-side active"
+                      : metaStatus?.config.pixelConfigured && metaStatus?.config.tokenConfigured
+                        ? "Configured · awaiting next event"
+                        : "Missing pixel/token"
+                  }
                 />
                 <StatusPill
-                  dotClass={metaStatus?.config.subscribeTrackingActive ? "bg-violet-400" : "bg-amber-300"}
+                  dotClass={
+                    metaStatus?.config.subscribeTrackingActive
+                      ? "bg-violet-400"
+                      : metaStatus?.config.pixelConfigured && metaStatus?.config.tokenConfigured
+                        ? "bg-slate-500"
+                        : "bg-red-400"
+                  }
                   label="Subscribe"
-                  value={metaStatus?.config.subscribeTrackingActive ? "Bot /start active" : "Waiting for credentials"}
+                  value={
+                    metaStatus?.config.subscribeTrackingActive
+                      ? "Bot /start active"
+                      : metaStatus?.config.pixelConfigured && metaStatus?.config.tokenConfigured
+                        ? "Configured · awaiting next /start"
+                        : "Missing pixel/token"
+                  }
                 />
               </div>
 

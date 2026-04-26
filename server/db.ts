@@ -1158,10 +1158,12 @@ export async function getRecentMetaActivityWindow(windowMs = 60 * 60 * 1000) {
     };
   }
   const since = new Date(Date.now() - windowMs);
+  // Subscribe now fires on /start (eventScope=telegram_start). Legacy
+  // telegram_join is kept as a fallback so historical rows still count.
   const [rows]: any = await db.execute(sql`
     SELECT
       MAX(CASE WHEN eventScope = 'pageview' AND status = 'sent' THEN completedAt END) AS pageViewLastSentAt,
-      MAX(CASE WHEN eventScope = 'telegram_join' AND status = 'sent' THEN completedAt END) AS subscribeLastSentAt
+      MAX(CASE WHEN eventScope IN ('telegram_start', 'telegram_join') AND status = 'sent' THEN completedAt END) AS subscribeLastSentAt
     FROM meta_event_logs
     WHERE completedAt IS NOT NULL AND completedAt >= ${since}
   `);
