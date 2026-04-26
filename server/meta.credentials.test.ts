@@ -67,9 +67,24 @@ describe("Meta browser pixel + server CAPI dual-send wiring", () => {
     expect(pageViewSource).toContain("utm_campaign");
   });
 
-  it("Telegram join flow forwards visitorId from the matching landing session into the Subscribe CAPI payload", () => {
-    expect(webhookSource).toContain("visitorId: session?.visitorId || undefined");
-    expect(webhookSource).toContain("fireSubscribeEvent");
+  it("Subscribe fires at /start (conversion intent) — not at channel join (approval-gating safe)", () => {
+    expect(webhookSource).toContain("fireSubscribeForStart");
+    expect(webhookSource).toContain('eventScope: "telegram_start"');
+    expect(webhookSource).toContain("tg_start_${args.telegramUserId}");
+    // Idempotency guard: don't re-fire Meta for repeat /starts.
+    expect(webhookSource).toContain('existing?.metaSubscribeStatus === "sent"');
+    // The /start handler must skip Meta for organic_start (no attribution).
+    expect(webhookSource).toContain("if (isAttributed)");
+  });
+
+  it("Join flow records analytics row but does NOT fire Meta (Subscribe is /start-driven)", () => {
+    // handleNewMember must not call Meta directly. The legacy abandon path
+    // for bypass joins is also gone (no Meta event = nothing to abandon).
+    expect(webhookSource).toContain("join_recorded_no_meta_fire");
+    expect(webhookSource).not.toContain("organic_bypass_skipped");
+    // Mirror /start-time eventId onto the join row for dashboard joins.
+    expect(webhookSource).toContain("startMetaEventId");
+    expect(webhookSource).toContain("startMetaStatus");
   });
 
   it("Webhook handler processes BEFORE responding on the success path so failures are retried by Telegram (no silent data loss)", () => {

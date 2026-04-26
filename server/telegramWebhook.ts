@@ -17,7 +17,6 @@ import {
   tryRecordTelegramUpdateId,
   updateBotStartMetaStatus,
   updateMetaEventLog,
-  updateMetaEventStatus,
   upsertBotStart,
   upsertTelegramLinkage,
 } from "./db";
@@ -180,6 +179,110 @@ async function resolveLandingSession(sessionToken?: string | null, funnelToken?:
   return undefined;
 }
 
+async function fireSubscribeForStart(args: {
+  telegramUserId: string;
+  telegramUsername?: string | null;
+  eventTime: number;
+  session?: Awaited<ReturnType<typeof resolveLandingSession>>;
+  sessionToken: string | null;
+  funnelToken: string | null;
+  ip: string | null;
+  ua: string | null;
+}) {
+  const existing = await getBotStartByTelegramUserId(args.telegramUserId);
+  // Idempotent: only fire once per user. Subsequent /starts skip Meta if it
+  // was already sent. The metaWorker handles retries for failed/retrying.
+  if (existing?.metaSubscribeStatus === "sent") {
+    return;
+  }
+  if (
+    existing?.metaSubscribeStatus &&
+    ["retrying", "failed", "queued"].includes(existing.metaSubscribeStatus)
+  ) {
+    // A prior /start already created the meta_event_log row — let the
+    // metaWorker's retry logic drive it to completion. Don't double-create.
+    return;
+  }
+
+  // eventId tied to firstStartedAt epoch so re-/start would compute the
+  // same id (but we skip via the idempotency check above anyway).
+  const firstStartedAt = existing?.firstStartedAt || existing?.startedAt || new Date();
+  const epochSeconds = Math.floor(new Date(firstStartedAt).getTime() / 1000);
+  const eventId = `tg_start_${args.telegramUserId}_${epochSeconds}`;
+
+  await createMetaEventLog({
+    eventType: "Subscribe",
+    eventScope: "telegram_start",
+    eventId,
+    funnelToken: args.funnelToken,
+    sessionToken: args.sessionToken,
+    telegramUserId: args.telegramUserId,
+    status: "queued",
+    retryable: 0,
+    attemptCount: 0,
+  });
+
+  try {
+    const metaResult = await fireSubscribeEvent({
+      eventId,
+      eventTime: Math.floor(args.eventTime),
+      telegramUserId: args.telegramUserId,
+      telegramUsername: args.telegramUsername || undefined,
+      visitorId: args.session?.visitorId || undefined,
+      fbclid: args.session?.fbclid || undefined,
+      fbp: args.session?.fbp || undefined,
+      sessionCreatedAt: args.session?.createdAt,
+      utmSource: args.session?.utmSource || undefined,
+      utmMedium: args.session?.utmMedium || undefined,
+      utmCampaign: args.session?.utmCampaign || undefined,
+      utmContent: args.session?.utmContent || undefined,
+      sourceUrl: args.session?.landingPage || undefined,
+      userAgent: args.session?.userAgent || args.ua || undefined,
+      ipAddress: args.session?.ipAddress || args.ip || undefined,
+    });
+
+    const status = metaResult.success ? "sent" : metaResult.retryable ? "retrying" : "failed";
+
+    await Promise.all([
+      updateMetaEventLog(eventId, {
+        requestPayloadJson: metaResult.requestBody ? JSON.stringify(metaResult.requestBody) : null,
+        responsePayloadJson: metaResult.responseBody ? JSON.stringify(metaResult.responseBody) : null,
+        httpStatus: metaResult.httpStatus ?? null,
+        status,
+        errorCode: metaResult.errorCode ?? null,
+        errorSubcode: metaResult.errorSubcode ?? null,
+        errorMessage: metaResult.errorMessage ?? null,
+        retryable: metaResult.retryable ? 1 : 0,
+        attemptCount: 1,
+        attemptedAt: new Date(),
+        completedAt: metaResult.success ? new Date() : null,
+        nextRetryAt: metaResult.retryable ? new Date(Date.now() + META_RETRY_DELAY_MS) : null,
+      }),
+      updateBotStartMetaStatus(args.telegramUserId, status, metaResult.eventId),
+    ]);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log.error("telegramWebhook", "meta_start_unexpected_error", {
+      telegramUserId: args.telegramUserId,
+      eventId,
+      error: message,
+    });
+
+    await Promise.all([
+      updateMetaEventLog(eventId, {
+        status: "retrying",
+        errorCode: "unexpected_error",
+        errorMessage: message,
+        retryable: 1,
+        attemptCount: 1,
+        attemptedAt: new Date(),
+        nextRetryAt: new Date(Date.now() + META_RETRY_DELAY_MS),
+      }),
+      updateBotStartMetaStatus(args.telegramUserId, "retrying", eventId),
+    ]);
+  }
+}
+
 async function handleNewMember(
   user: TelegramUser,
   chat: TelegramChat,
@@ -211,9 +314,11 @@ async function handleNewMember(
       ? "unattributed_join"
       : "bypass_join";
 
-  // Deterministic per (user, channel) so duplicate-delivery races collapse
-  // to the same Meta event_id (Meta dedupes on event_id within ~7 days).
-  const eventId = `tg_join_${telegramUserId}_${channelId}_${date}`;
+  // Subscribe fires on /start, NOT on join. We mirror the /start-time Meta
+  // event id/status onto the join row so dashboard queries that join
+  // telegram_joins.metaEventId → meta_event_logs still work.
+  const startMetaEventId = storedBotStart?.metaSubscribeEventId || null;
+  const startMetaStatus = storedBotStart?.metaSubscribeStatus || null;
 
   await insertTelegramJoin({
     telegramUserId,
@@ -231,7 +336,8 @@ async function handleNewMember(
     utmTerm: session?.utmTerm || null,
     fbclid: session?.fbclid || null,
     fbp: session?.fbp || null,
-    metaEventId: eventId,
+    metaEventId: startMetaEventId,
+    metaEventSent: startMetaStatus || undefined,
     sessionToken: resolvedSessionToken || session?.sessionToken || null,
     ipAddress: session?.ipAddress || ip,
     userAgent: session?.userAgent || ua,
@@ -244,113 +350,13 @@ async function handleNewMember(
     resolveTelegramLinkage(telegramUserId),
   ]);
 
-  const inserted = await getTelegramJoinByUserId(telegramUserId, channelId);
-  if (!inserted) {
-    return;
-  }
-
-  // Bypass joins (organic — no /start, no session) carry near-zero match
-  // signal. Sending Subscribe with only a hashed external_id pollutes Meta's
-  // Subscribe optimization signal without adding real attribution. Log it for
-  // visibility but don't fire the Meta call and don't retry.
-  if (attributionStatus === "bypass_join") {
-    await createMetaEventLog({
-      eventType: "Subscribe",
-      eventScope: "telegram_join",
-      eventId,
-      funnelToken: null,
-      sessionToken: null,
-      telegramUserId,
-      status: "abandoned",
-      retryable: 0,
-      attemptCount: 0,
-      errorCode: "organic_bypass_skipped",
-      errorMessage:
-        "Bypass join (no /start, no landing session) — Subscribe skipped to keep Meta optimization clean.",
-      attemptedAt: new Date(),
-      completedAt: new Date(),
-    });
-    await Promise.all([
-      updateMetaEventStatus(inserted.id, "abandoned", undefined),
-      updateBotStartMetaStatus(telegramUserId, "abandoned", undefined),
-    ]);
-    log.info("telegramWebhook", "bypass_join_skipped_meta", {
-      telegramUserId,
-      channelId,
-      eventId,
-    });
-    return;
-  }
-
-  await createMetaEventLog({
-    eventType: "Subscribe",
-    eventScope: "telegram_join",
-    eventId,
-    funnelToken: inserted.funnelToken || null,
-    sessionToken: inserted.sessionToken || null,
+  log.info("telegramWebhook", "join_recorded_no_meta_fire", {
     telegramUserId,
-    status: "queued",
-    retryable: 0,
-    attemptCount: 0,
+    channelId,
+    attributionStatus,
+    mirroredMetaStatus: startMetaStatus,
+    mirroredMetaEventId: startMetaEventId,
   });
-
-  try {
-    const metaResult = await fireSubscribeEvent({
-      eventId,
-      eventTime: Math.floor(date),
-      telegramUserId,
-      telegramUsername: user.username,
-      visitorId: session?.visitorId || undefined,
-      fbclid: session?.fbclid || undefined,
-      fbp: session?.fbp || undefined,
-      sessionCreatedAt: session?.createdAt,
-      utmSource: session?.utmSource || undefined,
-      utmMedium: session?.utmMedium || undefined,
-      utmCampaign: session?.utmCampaign || undefined,
-      utmContent: session?.utmContent || undefined,
-      sourceUrl: session?.landingPage || undefined,
-      userAgent: session?.userAgent || ua || undefined,
-      ipAddress: session?.ipAddress || ip || undefined,
-    });
-
-    const status = metaResult.success ? "sent" : metaResult.retryable ? "retrying" : "failed";
-
-    await Promise.all([
-      updateMetaEventLog(eventId, {
-        requestPayloadJson: metaResult.requestBody ? JSON.stringify(metaResult.requestBody) : null,
-        responsePayloadJson: metaResult.responseBody ? JSON.stringify(metaResult.responseBody) : null,
-        httpStatus: metaResult.httpStatus ?? null,
-        status,
-        errorCode: metaResult.errorCode ?? null,
-        errorSubcode: metaResult.errorSubcode ?? null,
-        errorMessage: metaResult.errorMessage ?? null,
-        retryable: metaResult.retryable ? 1 : 0,
-        attemptCount: 1,
-        attemptedAt: new Date(),
-        completedAt: metaResult.success ? new Date() : null,
-        nextRetryAt: metaResult.retryable ? new Date(Date.now() + META_RETRY_DELAY_MS) : null,
-      }),
-      updateMetaEventStatus(inserted.id, status, metaResult.eventId),
-      updateBotStartMetaStatus(telegramUserId, status, metaResult.eventId),
-    ]);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[Meta CAPI] join error:", err);
-
-    await Promise.all([
-      updateMetaEventLog(eventId, {
-        status: "retrying",
-        errorCode: "unexpected_error",
-        errorMessage: message,
-        retryable: 1,
-        attemptCount: 1,
-        attemptedAt: new Date(),
-        nextRetryAt: new Date(Date.now() + META_RETRY_DELAY_MS),
-      }),
-      updateMetaEventStatus(inserted.id, "retrying", eventId),
-      updateBotStartMetaStatus(telegramUserId, "retrying", eventId),
-    ]);
-  }
 }
 
 export function setupTelegramWebhook(app: Express) {
@@ -488,6 +494,24 @@ export function setupTelegramWebhook(app: Express) {
         fbclid: session?.fbclid || null,
         fbp: session?.fbp || null,
       });
+
+      // Fire Meta Subscribe at /start time (the conversion moment) — not at
+      // join time. /start is the optimization signal we want Meta to learn.
+      // Skip for organic_start (no session/funnel attribution) to keep the
+      // optimization signal clean.
+      const isAttributed = Boolean(session) || Boolean(decoded?.sessionToken) || Boolean(decoded?.funnelToken);
+      if (isAttributed) {
+        await fireSubscribeForStart({
+          telegramUserId: userId,
+          telegramUsername: telegramMessage.from.username,
+          eventTime: telegramMessage.date,
+          session,
+          sessionToken: decoded?.sessionToken || linkage?.sessionToken || session?.sessionToken || null,
+          funnelToken: decoded?.funnelToken || linkage?.funnelToken || session?.funnelToken || null,
+          ip,
+          ua,
+        });
+      }
 
       await scheduleTelegramReminderSequence({
         telegramUserId: userId,

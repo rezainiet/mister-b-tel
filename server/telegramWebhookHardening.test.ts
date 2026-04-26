@@ -178,12 +178,8 @@ describe("Telegram webhook hardening", () => {
     expect(vi.mocked(upsertBotStart)).toHaveBeenCalledTimes(1);
   });
 
-  it("skips Meta Subscribe entirely for bypass joins (no /start, no session)", async () => {
-    // Setup: getTelegramJoinByUserId returns undefined for the existence check,
-    // then returns the inserted row on the post-insert read.
-    vi.mocked(getTelegramJoinByUserId)
-      .mockResolvedValueOnce(undefined) // existence check
-      .mockResolvedValueOnce({ id: 99 } as any); // post-insert lookup
+  it("does not fire Meta Subscribe on join (Subscribe fires on /start instead)", async () => {
+    vi.mocked(getTelegramJoinByUserId).mockResolvedValue(undefined);
 
     const joinUpdate = {
       update_id: 999_010,
@@ -199,32 +195,31 @@ describe("Telegram webhook hardening", () => {
     await postUpdate(app.baseUrl, joinUpdate);
     await sleep(100);
 
-    // Subscribe must NOT be fired for organic bypass joins.
+    // Subscribe is now /start-driven. Joins never call Meta directly — they
+    // only insert the analytics row.
     expect(vi.mocked(fireSubscribeEvent)).not.toHaveBeenCalled();
-
-    // But the abandoned log row must exist for visibility.
-    const logCall = vi.mocked(createMetaEventLog).mock.calls.find(
-      (c) => c[0].errorCode === "organic_bypass_skipped",
+    expect(vi.mocked(insertTelegramJoin)).toHaveBeenCalledTimes(1);
+    // No legacy "abandoned" log row for bypass joins — that pattern is gone.
+    expect(vi.mocked(createMetaEventLog)).not.toHaveBeenCalledWith(
+      expect.objectContaining({ errorCode: "organic_bypass_skipped" }),
     );
-    expect(logCall).toBeTruthy();
-    expect(logCall![0].status).toBe("abandoned");
-
-    // Status helpers must mark the join + bot_start as abandoned (not pending).
-    expect(vi.mocked(updateMetaEventStatus)).toHaveBeenCalledWith(99, "abandoned", undefined);
-    expect(vi.mocked(updateBotStartMetaStatus)).toHaveBeenCalledWith("7777", "abandoned", undefined);
   });
 
-  it("uses a deterministic event_id for joins so duplicate webhook bursts collapse to one Meta event", async () => {
-    // Two consecutive deliveries of the same join (different update_ids, same
-    // user/channel/date) should produce identical event_ids if they reached
-    // handleNewMember (LRU prevents real second processing).
-    vi.mocked(getTelegramJoinByUserId)
-      .mockResolvedValueOnce(undefined)
-      .mockResolvedValueOnce({ id: 1 } as any);
+  it("mirrors the /start-time Meta event id onto the join row so dashboard JOINs to meta_event_logs still resolve", async () => {
+    // Simulate: the user previously /started the bot and that Subscribe was
+    // already sent. The join row should carry the same metaEventId so the
+    // dashboard can correlate.
+    const { getBotStartByTelegramUserId } = await import("./db");
+    vi.mocked(getBotStartByTelegramUserId).mockResolvedValue({
+      telegramUserId: "8888",
+      metaSubscribeEventId: "tg_start_8888_1700000000",
+      metaSubscribeStatus: "sent",
+    } as any);
+    vi.mocked(getTelegramJoinByUserId).mockResolvedValue(undefined);
 
     const date = Math.floor(Date.now() / 1000);
-    const joinUpdate = (updateId: number) => ({
-      update_id: updateId,
+    const joinUpdate = {
+      update_id: 999_020,
       chat_member: {
         chat: { id: -100, type: "supergroup", title: "Test" },
         from: { id: 8888, first_name: "Att" },
@@ -232,14 +227,14 @@ describe("Telegram webhook hardening", () => {
         old_chat_member: { user: { id: 8888 }, status: "left" },
         new_chat_member: { user: { id: 8888 }, status: "member" },
       },
-    });
+    };
 
-    await postUpdate(app.baseUrl, joinUpdate(999_020));
+    await postUpdate(app.baseUrl, joinUpdate);
     await sleep(50);
 
-    // The deterministic event_id format is `tg_join_<user>_<channel>_<date>`.
     expect(vi.mocked(insertTelegramJoin)).toHaveBeenCalledTimes(1);
     const inserted = vi.mocked(insertTelegramJoin).mock.calls[0][0];
-    expect(inserted.metaEventId).toBe(`tg_join_8888_-100_${date}`);
+    expect(inserted.metaEventId).toBe("tg_start_8888_1700000000");
+    expect(inserted.metaEventSent).toBe("sent");
   });
 });
