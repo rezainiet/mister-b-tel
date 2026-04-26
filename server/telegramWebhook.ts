@@ -74,13 +74,11 @@ export function __resetWebhookDedupForTests() {
 function isWebhookSecretValid(supplied: string | string[] | undefined) {
   const expected = getWebhookSecret();
   if (!expected) {
-    if (process.env.NODE_ENV === "production") {
-      log.error("telegramWebhook", "production_requires_secret_but_none_set");
-      return false;
-    }
-    // Dev convenience: if no secret is set we don't enforce, but warn loudly.
-    log.warn("telegramWebhook", "no_secret_configured_skip_check_dev_only");
-    return true;
+    // Always refuse when no secret is configured. Telegram webhooks are
+    // un-authenticated public endpoints; without the secret an attacker can
+    // forge updates and create fake bot starts / fake Subscribe events.
+    log.error("telegramWebhook", "secret_not_configured_refusing_request");
+    return false;
   }
   const headerValue = Array.isArray(supplied) ? supplied[0] : supplied;
   if (!headerValue) return false;

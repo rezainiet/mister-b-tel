@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -8,6 +9,7 @@ import {
   verifyDashboardPassword,
 } from "./_core/dashboardAuth";
 import { log } from "./_core/logger";
+import { checkRateLimit, getClientIp, recordSuccess } from "./_core/rateLimit";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import {
@@ -25,6 +27,7 @@ import {
   getRecentBotStartsWithMetaStatus,
   getRecentMetaActivityWindow,
   getRecentMetaDebugLog,
+  getRecordEventStats,
   getRetryableMetaEvents,
   getTodayStats,
   updateBotStartMetaStatus,
@@ -40,7 +43,7 @@ import {
 import { sendPageView } from "./facebookCapi";
 import { buildServerFbc, retryStoredMetaRequest } from "./metaCapi";
 import { getUtmSessionByToken } from "./db";
-import { syncTelegramGroupUrlContent, TELEGRAM_GROUP_URL_SETTING_KEY } from "./telegramGroupLink";
+import { syncTelegramGroupUrlContent, TELEGRAM_GROUP_URL_SETTING_KEY, validateTelegramGroupUrl } from "./telegramGroupLink";
 
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || "Misternb_bot";
 
@@ -68,6 +71,22 @@ function getHeaderString(value: string | string[] | undefined, fallback = "") {
   }
 
   return value || fallback;
+}
+
+const TRACKING_BUDGET = { limit: 120, windowMs: 60_000 } as const;
+const LOGIN_BUDGET = { limit: 8, windowMs: 15 * 60_000, blockMs: 15 * 60_000 } as const;
+
+function isAllowedTrackingOrigin(origin: string, host: string) {
+  if (!origin) return true; // many privacy-respecting browsers strip Origin on same-origin POST
+  try {
+    const parsed = new URL(origin);
+    if (!host) return true;
+    // Strip port from host (e.g. "mister-b.club:443") for comparison.
+    const hostName = host.split(":")[0];
+    return parsed.hostname === hostName || parsed.hostname.endsWith(`.${hostName}`);
+  } catch {
+    return false;
+  }
 }
 
 const dashboardAuthInput = z.object({
@@ -106,6 +125,16 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ input, ctx }) => {
+        const ip = getClientIp(ctx.req);
+        const origin = getHeaderString(ctx.req.headers.origin);
+        const host = getHeaderString(ctx.req.headers.host);
+        if (!isAllowedTrackingOrigin(origin, host)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Cross-origin tracking is not allowed." });
+        }
+        const limit = checkRateLimit(`tracking.createSession:${ip}`, TRACKING_BUDGET);
+        if (!limit.allowed) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded." });
+        }
         const sessionToken = randomSessionToken();
         const funnelToken = input.funnelToken || randomSessionToken();
         const payload = encodeTelegramStartPayload(sessionToken, funnelToken, "group");
@@ -151,7 +180,17 @@ export const appRouter = router({
           eventId: z.string().optional(),
         }),
       )
-      .mutation(async ({ input }) => {
+      .mutation(async ({ input, ctx }) => {
+        const ip = getClientIp(ctx.req);
+        const origin = getHeaderString(ctx.req.headers.origin);
+        const host = getHeaderString(ctx.req.headers.host);
+        if (!isAllowedTrackingOrigin(origin, host)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Cross-origin tracking is not allowed." });
+        }
+        const limit = checkRateLimit(`tracking.markTelegramClick:${ip}`, TRACKING_BUDGET);
+        if (!limit.allowed) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded." });
+        }
         await markSessionClicked(input.sessionToken);
         await recordEvent({
           eventType: "telegram_click",
@@ -182,6 +221,16 @@ export const appRouter = router({
         }),
       )
       .mutation(async ({ input, ctx }) => {
+        const ip = getClientIp(ctx.req);
+        const origin = getHeaderString(ctx.req.headers.origin);
+        const host = getHeaderString(ctx.req.headers.host);
+        if (!isAllowedTrackingOrigin(origin, host)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Cross-origin tracking is not allowed." });
+        }
+        const limit = checkRateLimit(`tracking.record:${ip}`, TRACKING_BUDGET);
+        if (!limit.allowed) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Rate limit exceeded." });
+        }
         const userAgent = getHeaderString(ctx.req.headers["user-agent"]);
         const referrer = getHeaderString(ctx.req.headers.referer);
         const forwardedFor = getHeaderString(ctx.req.headers["x-forwarded-for"]);
@@ -288,9 +337,23 @@ export const appRouter = router({
           password: z.string().min(1),
         }),
       )
-      .mutation(({ input }) => {
+      .mutation(({ input, ctx }) => {
+        const ip = getClientIp(ctx.req);
+        const limitKey = `dashboard.login:${ip}`;
+        const limit = checkRateLimit(limitKey, LOGIN_BUDGET);
+
+        if (!limit.allowed) {
+          log.warn("dashboard.login", "rate_limited", { ip, retryAfterMs: limit.retryAfterMs });
+          const retryAfterSeconds = Math.ceil(limit.retryAfterMs / 1000);
+          return {
+            success: false,
+            token: null,
+            error: `Trop de tentatives — réessaie dans ${retryAfterSeconds}s.`,
+          } as const;
+        }
+
         if (!verifyDashboardPassword(input.password)) {
-          log.warn("dashboard.login", "rejected_password_attempt");
+          log.warn("dashboard.login", "rejected_password_attempt", { ip });
           return {
             success: false,
             token: null,
@@ -299,9 +362,11 @@ export const appRouter = router({
         }
 
         try {
+          const token = buildDashboardToken();
+          recordSuccess(limitKey);
           return {
             success: true,
-            token: buildDashboardToken(),
+            token,
           } as const;
         } catch (error) {
           log.error("dashboard.login", "token_issuance_failed", {
@@ -508,7 +573,14 @@ export const appRouter = router({
           return { error: "Unauthorized" } as const;
         }
         if (input.key === TELEGRAM_GROUP_URL_SETTING_KEY) {
-          await syncTelegramGroupUrlContent(input.value.trim());
+          const validation = validateTelegramGroupUrl(input.value);
+          if (!validation.ok) {
+            log.warn("dashboard.updateSetting", "telegram_group_url_rejected", {
+              error: validation.error,
+            });
+            return { success: false, error: validation.error } as const;
+          }
+          await syncTelegramGroupUrlContent(validation.value);
           return { success: true } as const;
         }
         await upsertSetting(input.key, input.value);
@@ -528,6 +600,15 @@ export const appRouter = router({
           telegramClicks: 0,
         } as const)
       );
+    }),
+    trackingHealth: publicProcedure.input(dashboardAuthInput).query(({ input }) => {
+      if (!isDashboardTokenValid(input.token)) {
+        return { error: "Unauthorized" } as const;
+      }
+      // Surfaces the in-process recordEvent counter so silent DB failures
+      // become visible to the operator (the function used to swallow errors
+      // with a single console.error).
+      return getRecordEventStats();
     }),
   }),
 });

@@ -112,6 +112,47 @@ export async function getUserByOpenId(openId: string) {
 // TRACKING FUNCTIONS
 // ═══════════════════════════════════════════════════════════
 
+type DailyStatCounter =
+  | "pageviews"
+  | "uniqueVisitors"
+  | "whatsappClicks"
+  | "telegramClicks"
+  | "scroll25"
+  | "scroll50"
+  | "scroll75"
+  | "scroll100";
+
+const DAILY_STAT_COUNTER_BY_EVENT: Record<string, DailyStatCounter> = {
+  pageview: "pageviews",
+  unique_visitor: "uniqueVisitors",
+  whatsapp_click: "whatsappClicks",
+  telegram_click: "telegramClicks",
+  scroll_25: "scroll25",
+  scroll_50: "scroll50",
+  scroll_75: "scroll75",
+  scroll_100: "scroll100",
+};
+
+function dailyCounterIncrement(counter: DailyStatCounter) {
+  switch (counter) {
+    case "pageviews": return sql`${dailyStats.pageviews} + 1`;
+    case "uniqueVisitors": return sql`${dailyStats.uniqueVisitors} + 1`;
+    case "whatsappClicks": return sql`${dailyStats.whatsappClicks} + 1`;
+    case "telegramClicks": return sql`${dailyStats.telegramClicks} + 1`;
+    case "scroll25": return sql`${dailyStats.scroll25} + 1`;
+    case "scroll50": return sql`${dailyStats.scroll50} + 1`;
+    case "scroll75": return sql`${dailyStats.scroll75} + 1`;
+    case "scroll100": return sql`${dailyStats.scroll100} + 1`;
+  }
+}
+
+type RecordEventStats = { ok: number; failed: number; lastError: string | null; lastErrorAt: Date | null };
+const recordEventStats: RecordEventStats = { ok: 0, failed: 0, lastError: null, lastErrorAt: null };
+
+export function getRecordEventStats(): Readonly<RecordEventStats> {
+  return { ...recordEventStats };
+}
+
 export async function recordEvent(event: InsertTrackingEvent) {
   const db = await getDb();
   if (!db) return;
@@ -119,72 +160,42 @@ export async function recordEvent(event: InsertTrackingEvent) {
   try {
     await db.insert(trackingEvents).values(event);
 
-    const today = new Date().toISOString().slice(0, 10);
-    const existing = await db
-      .select()
-      .from(dailyStats)
-      .where(eq(dailyStats.date, today))
-      .limit(1);
-
-    if (existing.length === 0) {
-      const newStat: Record<string, unknown> = {
-        date: today,
-        pageviews: 0,
-        uniqueVisitors: 0,
-        whatsappClicks: 0,
-        telegramClicks: 0,
-        scroll25: 0,
-        scroll50: 0,
-        scroll75: 0,
-        scroll100: 0,
-        avgTimeOnPage: 0,
-        conversionRate: "0",
-      };
-
-      if (event.eventType === "pageview") newStat.pageviews = 1;
-      if (event.eventType === "unique_visitor") newStat.uniqueVisitors = 1;
-      if (event.eventType === "whatsapp_click") newStat.whatsappClicks = 1;
-      if (event.eventType === "telegram_click") newStat.telegramClicks = 1;
-      if (event.eventType === "scroll_25") newStat.scroll25 = 1;
-      if (event.eventType === "scroll_50") newStat.scroll50 = 1;
-      if (event.eventType === "scroll_75") newStat.scroll75 = 1;
-      if (event.eventType === "scroll_100") newStat.scroll100 = 1;
-
-      await db.insert(dailyStats).values(newStat as typeof dailyStats.$inferInsert);
+    const counter = DAILY_STAT_COUNTER_BY_EVENT[event.eventType];
+    if (!counter) {
+      recordEventStats.ok += 1;
       return;
     }
 
-    const updates: Record<string, unknown> = {};
+    const today = new Date().toISOString().slice(0, 10);
 
-    if (event.eventType === "pageview") {
-      updates.pageviews = sql`${dailyStats.pageviews} + 1`;
-    }
-    if (event.eventType === "unique_visitor") {
-      updates.uniqueVisitors = sql`${dailyStats.uniqueVisitors} + 1`;
-    }
-    if (event.eventType === "whatsapp_click") {
-      updates.whatsappClicks = sql`${dailyStats.whatsappClicks} + 1`;
-    }
-    if (event.eventType === "telegram_click") {
-      updates.telegramClicks = sql`${dailyStats.telegramClicks} + 1`;
-    }
-    if (event.eventType === "scroll_25") {
-      updates.scroll25 = sql`${dailyStats.scroll25} + 1`;
-    }
-    if (event.eventType === "scroll_50") {
-      updates.scroll50 = sql`${dailyStats.scroll50} + 1`;
-    }
-    if (event.eventType === "scroll_75") {
-      updates.scroll75 = sql`${dailyStats.scroll75} + 1`;
-    }
-    if (event.eventType === "scroll_100") {
-      updates.scroll100 = sql`${dailyStats.scroll100} + 1`;
-    }
+    // Single round-trip upsert: relies on the UNIQUE INDEX on
+    // daily_stats.date (migration 0009). Replaces the legacy SELECT →
+    // INSERT/UPDATE 3-statement pattern.
+    const insertValues: typeof dailyStats.$inferInsert = {
+      date: today,
+      pageviews: 0,
+      uniqueVisitors: 0,
+      whatsappClicks: 0,
+      telegramClicks: 0,
+      scroll25: 0,
+      scroll50: 0,
+      scroll75: 0,
+      scroll100: 0,
+      avgTimeOnPage: 0,
+      conversionRate: "0",
+    };
+    (insertValues as Record<string, unknown>)[counter] = 1;
 
-    if (Object.keys(updates).length > 0) {
-      await db.update(dailyStats).set(updates).where(eq(dailyStats.date, today));
-    }
+    await db
+      .insert(dailyStats)
+      .values(insertValues)
+      .onDuplicateKeyUpdate({ set: { [counter]: dailyCounterIncrement(counter) } });
+
+    recordEventStats.ok += 1;
   } catch (error) {
+    recordEventStats.failed += 1;
+    recordEventStats.lastError = error instanceof Error ? error.message : String(error);
+    recordEventStats.lastErrorAt = new Date();
     console.error("[Tracking] Failed to record event:", error);
   }
 }
@@ -849,7 +860,13 @@ export async function updateMetaEventStatus(
 export async function createMetaEventLog(log: InsertMetaEventLog) {
   const db = await getDb();
   if (!db) return;
-  await db.insert(metaEventLogs).values(log);
+  // Idempotent insert. The eventId is the dedup key; webhook/worker retries
+  // re-invoking createMetaEventLog must not raise a duplicate-key error
+  // (1062), which would otherwise unwind the entire request handler.
+  await db
+    .insert(metaEventLogs)
+    .values(log)
+    .onDuplicateKeyUpdate({ set: { updatedAt: new Date() } });
 }
 
 export async function updateMetaEventLog(

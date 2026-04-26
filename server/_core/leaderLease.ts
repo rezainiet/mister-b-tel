@@ -76,13 +76,18 @@ export async function tryAcquireLease(
       VALUES (${key}, ${newValue})
     `);
     // Verify it's actually ours now (the INSERT IGNORE may have been a no-op).
-    const verifyRows: any = await db.execute(sql`
+    // mysql2's `db.execute` returns `[rows, fields]` where `rows` is an array
+    // of plain objects. Drizzle's loose typing meant we previously read
+    // `verifyRows[0][0].value` AND `verifyRows[0].value` defensively — both
+    // shapes never coexist, and the wrong one returned undefined → spurious
+    // "not leader" results. Pin to the correct mysql2 shape.
+    const verifyRows = (await db.execute(sql`
       SELECT ${siteSettings.settingValue} AS value
       FROM ${siteSettings}
       WHERE ${siteSettings.settingKey} = ${key}
       LIMIT 1
-    `);
-    const actualValue: string | undefined = verifyRows?.[0]?.[0]?.value || verifyRows?.[0]?.value;
+    `)) as unknown as [Array<{ value?: string | null }>, unknown];
+    const actualValue = verifyRows?.[0]?.[0]?.value ?? null;
     return Boolean(actualValue && actualValue.startsWith(`${INSTANCE_ID}|`));
   } catch (error) {
     log.warn("leaderLease", "insert_failed", {

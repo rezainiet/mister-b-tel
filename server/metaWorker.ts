@@ -24,12 +24,15 @@ let workerInterval: NodeJS.Timeout | null = null;
 let workerRunning = false;
 
 function backoffMs(nextAttempt: number) {
-  // 5m, 10m, 20m, 40m, 80m, then capped at 6h. Full jitter on the lower
-  // half of the window to avoid thundering herd when many events come due
-  // at once.
+  // Exponential backoff with full jitter (AWS pattern): the actual delay is a
+  // uniform random sample in [0, capped]. Median is capped/2; expected value
+  // is capped/2; max is capped. This avoids thundering-herd while keeping the
+  // worst case bounded by the cap.
+  // Schedule (per attempt, expected): ~2.5m, 5m, 10m, 20m, 40m, then 3h cap.
   const exponential = BASE_BACKOFF_MS * Math.pow(2, Math.max(0, nextAttempt - 1));
   const capped = Math.min(exponential, MAX_BACKOFF_MS);
-  return Math.floor(Math.random() * capped) + Math.floor(capped / 2);
+  // Floor at 1s so a 0 sample doesn't immediately re-fire on the next tick.
+  return Math.max(1_000, Math.floor(Math.random() * capped));
 }
 
 export async function processOneMetaRetryBatch(limit = 10) {

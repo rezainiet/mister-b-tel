@@ -12,11 +12,14 @@ const routersSource = readFileSync(resolve(import.meta.dirname, "./routers.ts"),
 describe("Meta browser pixel + server CAPI dual-send wiring", () => {
   it("loads the Meta Pixel browser script and fires PageView with the same eventID the server uses", () => {
     expect(clientHtml).toContain("connect.facebook.net/en_US/fbevents.js");
-    expect(clientHtml).toContain("fbq('init', '945883278158292')");
+    // Pixel ID is injected by Vite from VITE_META_PIXEL_ID so the browser pixel
+    // and server CAPI always share the same id (no hardcoded duplication).
+    expect(clientHtml).toContain('var _misterbPixelId = "%VITE_META_PIXEL_ID%"');
+    expect(clientHtml).toContain("fbq('init', _misterbPixelId)");
     expect(clientHtml).toContain("fbq('track', 'PageView', {}, { eventID: _pvEventId })");
     expect(clientHtml).toContain('window.__misterbPageViewEventId = _pvEventId');
     expect(clientHtml).toContain('sessionStorage.setItem("misterb_pv_event_id", _pvEventId)');
-    expect(clientHtml).toContain("facebook.com/tr?id=945883278158292");
+    expect(clientHtml).toContain("facebook.com/tr?id=%VITE_META_PIXEL_ID%");
   });
 
   it("ensures _fbp cookie is created early so the very first server PageView captures it", () => {

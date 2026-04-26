@@ -87,16 +87,19 @@ export async function postMetaPayload(
     };
   }
 
+  // Clone before mutating so the caller's object — and any payload we may
+  // later persist for retries — never sees the env-injected test_event_code.
   const envTestCode = process.env.META_TEST_EVENT_CODE;
-  if (envTestCode && !payload.test_event_code) {
-    payload.test_event_code = envTestCode;
-  }
+  const requestPayload =
+    envTestCode && !payload.test_event_code
+      ? { ...payload, test_event_code: envTestCode }
+      : payload;
 
   try {
     const response = await fetch(`${CAPI_URL}?access_token=${ACCESS_TOKEN}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(requestPayload),
     });
 
     const body = (await response.json().catch(() => null)) as
@@ -130,7 +133,7 @@ export async function postMetaPayload(
       eventId,
       httpStatus: response.status,
       responseBody: body,
-      requestBody: payload,
+      requestBody: requestPayload,
       errorCode,
       errorSubcode,
       errorMessage,
@@ -141,7 +144,7 @@ export async function postMetaPayload(
     return {
       success: false,
       eventId,
-      requestBody: payload,
+      requestBody: requestPayload,
       errorCode: "network_error",
       errorMessage,
       retryable: true,

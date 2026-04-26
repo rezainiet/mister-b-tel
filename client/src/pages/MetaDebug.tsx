@@ -17,7 +17,13 @@ import {
 import { trpc } from "@/lib/trpc";
 
 const TOKEN_KEY = "misterb-dash-token";
-const TRACKING_STORAGE_KEY = "misterb_tracking_session_v2";
+// Try the live key (v4) first, then fall back to legacy keys mirrored by
+// tracking.ts so we can debug both fresh and stale browser sessions.
+const TRACKING_STORAGE_KEYS = [
+  "misterb_tracking_session_v4",
+  "misterb_tracking_session_v3",
+  "misterb_tracking_session_v2",
+];
 
 const LIMIT = 10;
 
@@ -237,7 +243,6 @@ function readBrowserSnapshot(): BrowserSnapshot {
 
   const params = new URLSearchParams(window.location.search);
   const storedPageViewEventId = window.sessionStorage.getItem("misterb_pv_event_id");
-  const storedSessionRaw = window.sessionStorage.getItem(TRACKING_STORAGE_KEY);
 
   let storedSession: {
     sessionToken?: string;
@@ -246,11 +251,14 @@ function readBrowserSnapshot(): BrowserSnapshot {
     telegramDeepLink?: string;
   } | null = null;
 
-  if (storedSessionRaw) {
+  for (const key of TRACKING_STORAGE_KEYS) {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) continue;
     try {
-      storedSession = JSON.parse(storedSessionRaw);
+      storedSession = JSON.parse(raw);
+      break;
     } catch {
-      storedSession = null;
+      // try the next legacy key
     }
   }
 

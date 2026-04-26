@@ -84,7 +84,9 @@ describe("tracking session parser", () => {
     expect(session?.telegramBotUrl).toBe(
       "https://t.me/Misternb_bot?start=Z3JvdXA6ZGV2UlBrUUUyTnIzV2I1aDZpREtpWllnSXZyTmx4cTU",
     );
-    expect(sessionStorage.getItem("misterb_tracking_session_v2")).toContain("?start=");
+    // The active key is v4 (no longer mirrored to legacy keys; reads still
+    // fall back to v3/v2 for in-flight sessions across the deploy boundary).
+    expect(sessionStorage.getItem("misterb_tracking_session_v4")).toContain("?start=");
   });
 
   it("waits for createSession and markTelegramClick before resolving the Telegram group click helper", async () => {

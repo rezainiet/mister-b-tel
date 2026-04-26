@@ -223,17 +223,10 @@ function readStoredSession(): TrackingSession | null {
 
 function storeSession(session: TrackingSession) {
   if (typeof window === "undefined") return;
-  const serialized = JSON.stringify(session);
-  window.sessionStorage.setItem(STORAGE_KEY, serialized);
-  // Mirror to legacy keys so the MetaDebug panel and any older readers still
-  // surface the latest session payload after the storage-key bump.
-  for (const legacyKey of LEGACY_STORAGE_KEYS) {
-    try {
-      window.sessionStorage.setItem(legacyKey, serialized);
-    } catch {
-      // Ignore quota errors — primary key is what counts.
-    }
-  }
+  // Only the v4 key is written. Reads still fall back to LEGACY_STORAGE_KEYS
+  // so an in-flight session created before this deploy continues to resolve
+  // for one browser session; new sessions stop polluting old keys.
+  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(session));
 }
 
 async function postTrackingRecord(input: {
@@ -401,7 +394,7 @@ export async function trackTelegramGroupClick(source = "telegram_group_cta") {
   return session;
 }
 
-export function trackTelegramClick(source = "telegram_contact_cta") {
+export async function trackTelegramClick(source = "telegram_contact_cta") {
   const storedSession = readStoredSession();
 
   trackClarityEvent("telegram_contact_click", {
@@ -409,7 +402,7 @@ export function trackTelegramClick(source = "telegram_contact_cta") {
     clarity_event_target: "telegram_contact",
   });
 
-  void postTrackingRecord({
+  await postTrackingRecord({
     eventType: "telegram_click",
     eventSource: source,
     visitorId: getVisitorId(),
@@ -436,9 +429,72 @@ export async function initAdvancedTracking(): Promise<TrackingSession | null> {
       sessionToken: session?.sessionToken,
       funnelToken: session?.funnelToken || fallbackFunnelToken,
     });
+    initScrollDepthTracking();
   }
 
   return session;
+}
+
+const SCROLL_DEPTH_FIRED = new Set<25 | 50 | 75 | 100>();
+let scrollListenerAttached = false;
+
+function emitScrollDepth(depth: 25 | 50 | 75 | 100) {
+  if (SCROLL_DEPTH_FIRED.has(depth)) return;
+  SCROLL_DEPTH_FIRED.add(depth);
+  const stored = readStoredSession();
+  void postTrackingRecord({
+    eventType: `scroll_${depth}`,
+    eventSource: "landing",
+    visitorId: getVisitorId(),
+    eventId: randomId(`scroll_${depth}`),
+    sessionToken: stored?.sessionToken,
+    funnelToken: stored?.funnelToken || getOrCreateFunnelToken(),
+  });
+}
+
+function computeScrollPercent(): number {
+  if (typeof window === "undefined" || typeof document === "undefined") return 0;
+  const doc = document.documentElement;
+  const scrollTop = window.scrollY || doc.scrollTop || 0;
+  const viewport = window.innerHeight || doc.clientHeight || 0;
+  const fullHeight = Math.max(
+    doc.scrollHeight || 0,
+    document.body?.scrollHeight || 0,
+    doc.offsetHeight || 0,
+  );
+  const scrollable = Math.max(1, fullHeight - viewport);
+  if (fullHeight <= viewport) return 100;
+  return Math.min(100, Math.round((scrollTop / scrollable) * 100));
+}
+
+function initScrollDepthTracking() {
+  if (typeof window === "undefined") return;
+  if (scrollListenerAttached) return;
+  scrollListenerAttached = true;
+
+  const handler = () => {
+    const pct = computeScrollPercent();
+    if (pct >= 25) emitScrollDepth(25);
+    if (pct >= 50) emitScrollDepth(50);
+    if (pct >= 75) emitScrollDepth(75);
+    if (pct >= 100) emitScrollDepth(100);
+
+    if (SCROLL_DEPTH_FIRED.size === 4) {
+      window.removeEventListener("scroll", handler);
+      window.removeEventListener("resize", handler);
+    }
+  };
+
+  // Fire once on init for short pages where the user already sees everything.
+  handler();
+
+  window.addEventListener("scroll", handler, { passive: true });
+  window.addEventListener("resize", handler, { passive: true });
+}
+
+export function __resetScrollDepthForTests() {
+  SCROLL_DEPTH_FIRED.clear();
+  scrollListenerAttached = false;
 }
 
 export function openTelegramGroupDirectly(exactBotUrl?: string) {

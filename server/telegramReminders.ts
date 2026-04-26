@@ -168,20 +168,25 @@ export async function scheduleTelegramReminderSequence(input: BuildReminderDraft
 
   const drafts = await buildTelegramReminderDrafts(input);
 
-  await db
-    .delete(telegramReminderJobs)
-    .where(
-      and(
-        eq(telegramReminderJobs.telegramUserId, input.telegramUserId),
-        or(
-          eq(telegramReminderJobs.status, "pending"),
-          eq(telegramReminderJobs.status, "processing"),
-          eq(telegramReminderJobs.status, "failed"),
+  // Delete + insert run inside a single transaction so two concurrent /start
+  // events for the same user can't interleave their delete-then-insert and
+  // produce duplicate reminder jobs (the previous flow was racy).
+  await db.transaction(async (tx) => {
+    await tx
+      .delete(telegramReminderJobs)
+      .where(
+        and(
+          eq(telegramReminderJobs.telegramUserId, input.telegramUserId),
+          or(
+            eq(telegramReminderJobs.status, "pending"),
+            eq(telegramReminderJobs.status, "processing"),
+            eq(telegramReminderJobs.status, "failed"),
+          ),
         ),
-      ),
-    );
+      );
 
-  await db.insert(telegramReminderJobs).values(drafts);
+    await tx.insert(telegramReminderJobs).values(drafts);
+  });
 }
 
 export async function skipPendingTelegramReminderJobs(

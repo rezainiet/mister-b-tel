@@ -57,6 +57,20 @@
       "when": 1798041600000,
       "tag": "0007_funnel_hardening",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "5",
+      "when": 1777201830356,
+      "tag": "0008_steep_morlocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "5",
+      "when": 1798200000000,
+      "tag": "0009_daily_stats_unique_date",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,49 @@ export const DEFAULT_TELEGRAM_GROUP_URL =
   process.env.TELEGRAM_GROUP_URL || "https://t.me/+sdIa7KNoIbNjMTg0";
 export const TELEGRAM_GROUP_URL_SETTING_KEY = "telegram_group_url";
 
+const ALLOWED_TELEGRAM_HOSTS = new Set(["t.me", "telegram.me", "telegram.org"]);
+
+export type TelegramGroupUrlValidation =
+  | { ok: true; value: string }
+  | { ok: false; error: string };
+
+export function validateTelegramGroupUrl(rawValue: string): TelegramGroupUrlValidation {
+  const trimmed = (rawValue || "").trim();
+  if (!trimmed) {
+    return { ok: false, error: "URL is required." };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return { ok: false, error: "Not a valid URL." };
+  }
+
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    return { ok: false, error: "URL must use http(s)." };
+  }
+
+  if (!ALLOWED_TELEGRAM_HOSTS.has(parsed.hostname.toLowerCase())) {
+    return {
+      ok: false,
+      error: `URL host must be one of: ${Array.from(ALLOWED_TELEGRAM_HOSTS).join(", ")}.`,
+    };
+  }
+
+  if (!parsed.pathname || parsed.pathname === "/") {
+    return { ok: false, error: "URL must include a Telegram path (e.g. /+inviteCode)." };
+  }
+
+  // Strip whitespace and reject anything containing whitespace mid-URL — the
+  // setting feeds reminder texts that get rendered in Telegram messages.
+  if (/\s/.test(trimmed)) {
+    return { ok: false, error: "URL must not contain whitespace." };
+  }
+
+  return { ok: true, value: parsed.toString() };
+}
+
 const BOT_TEXT_SETTING_KEYS = [
   "welcome_message",
   "telegram_reminder_15m_message",

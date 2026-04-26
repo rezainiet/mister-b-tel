@@ -11,7 +11,22 @@ import { sendTelegramMessage, type SendTelegramMessageResult } from "./telegramB
 const WORKER_NAME = "telegram_admin_reports";
 
 const PARIS_TIMEZONE = "Europe/Paris";
-const AUTHORIZED_REPORT_USERNAMES = ["bestmanylitics", "coucoulala123"] as const;
+
+const DEFAULT_AUTHORIZED_REPORT_USERNAMES = ["bestmanylitics", "coucoulala123"] as const;
+
+function loadAuthorizedReportUsernames(): readonly string[] {
+  // TELEGRAM_ADMIN_USERNAMES is a comma-separated list of bare usernames
+  // (no leading @). Falls back to the documented defaults when unset.
+  const fromEnv = (process.env.TELEGRAM_ADMIN_USERNAMES || "")
+    .split(",")
+    .map((entry) => entry.replace(/^@/, "").trim().toLowerCase())
+    .filter(Boolean);
+
+  if (fromEnv.length > 0) return fromEnv;
+  return DEFAULT_AUTHORIZED_REPORT_USERNAMES;
+}
+
+const AUTHORIZED_REPORT_USERNAMES = loadAuthorizedReportUsernames();
 const REPORT_LAST_SLOT_SETTING_KEY = "telegram_admin_report_last_slot";
 const REPORT_WORKER_INTERVAL_MS = 60_000;
 const SCHEDULED_REPORT_MINUTE_WINDOW = 5;
@@ -144,7 +159,7 @@ export async function getAuthorizedTelegramAdminRecipients() {
 
 export async function isTelegramAdminAuthorized(userId: string, username?: string | null) {
   const normalizedUsername = username?.replace(/^@/, "").trim().toLowerCase() || "";
-  if (AUTHORIZED_REPORT_USERNAMES.includes(normalizedUsername as (typeof AUTHORIZED_REPORT_USERNAMES)[number])) {
+  if (normalizedUsername && AUTHORIZED_REPORT_USERNAMES.includes(normalizedUsername)) {
     return true;
   }
 

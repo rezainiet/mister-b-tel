@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import {
@@ -360,6 +360,109 @@ function StatusPill({
   );
 }
 
+const SubscriberDiagnosticRow = memo(function SubscriberDiagnosticRow({ row }: { row: SubscriberLogRow }) {
+  const metaBadge = metaStatusBadge(row.metaSubscribeStatus);
+  const sessionBadge = presenceBadge(row.sessionToken);
+  const fbclidBadge = presenceBadge(row.fbclid);
+
+  return (
+    <div className="rounded-[18px] border border-slate-800 bg-slate-950/70 px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white">{formatSubscriberIdentity(row)}</p>
+          <p className="mt-1 truncate text-sm text-slate-400">
+            {row.telegramFirstName ? `${row.telegramFirstName} · ` : ""}
+            {formatDateTime(row.startedAt)}
+          </p>
+        </div>
+        <span
+          className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${metaBadge.border} ${metaBadge.background} ${metaBadge.text}`}
+        >
+          <span className={`h-2 w-2 rounded-full ${metaBadge.dot}`} /> {metaBadge.label}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-400 sm:grid-cols-3 lg:grid-cols-6">
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
+          <p className="uppercase tracking-[0.16em] text-slate-500">Start bot</p>
+          <p className="mt-1 text-sm text-slate-200">{formatRelativeTime(row.startedAt)}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
+          <p className="uppercase tracking-[0.16em] text-slate-500">Ajout canal</p>
+          <p className="mt-1 text-sm text-slate-200">{row.joinedAt ? formatDateTime(row.joinedAt) : "Pas encore confirmé"}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
+          <p className="uppercase tracking-[0.16em] text-slate-500">Meta</p>
+          <p className="mt-1 text-sm text-slate-200">{metaBadge.label}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
+          <p className="uppercase tracking-[0.16em] text-slate-500">IP</p>
+          <p className="mt-1 truncate font-mono text-sm text-slate-200" title={row.ipAddress || ""}>
+            {row.ipAddress || "—"}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
+          <p className="uppercase tracking-[0.16em] text-slate-500">Session token</p>
+          <span className={`mt-1 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${sessionBadge.border} ${sessionBadge.background} ${sessionBadge.text}`}>
+            <span className={`h-2 w-2 rounded-full ${sessionBadge.dot}`} /> {sessionBadge.label}
+          </span>
+        </div>
+        <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
+          <p className="uppercase tracking-[0.16em] text-slate-500">FBCLID</p>
+          <span className={`mt-1 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${fbclidBadge.border} ${fbclidBadge.background} ${fbclidBadge.text}`}>
+            <span className={`h-2 w-2 rounded-full ${fbclidBadge.dot}`} /> {fbclidBadge.label}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+const SubscriberConversionRow = memo(function SubscriberConversionRow({ row }: { row: SubscriberLogRow }) {
+  const badge = metaStatusBadge(row.metaSubscribeStatus);
+  const attribution = formatSubscriberAttribution(row);
+
+  return (
+    <div className="rounded-[18px] border border-slate-800 bg-slate-950/70 px-4 py-3">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-white">{formatSubscriberIdentity(row)}</p>
+          <p className="mt-1 truncate text-sm text-slate-400">
+            {row.telegramFirstName ? `${row.telegramFirstName} · ` : ""}
+            {attribution || "Direct / unknown attribution"}
+          </p>
+        </div>
+        <span
+          className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${badge.border} ${badge.background} ${badge.text}`}
+        >
+          <span className={`h-2 w-2 rounded-full ${badge.dot}`} /> {badge.label}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-400 sm:grid-cols-3 lg:grid-cols-5">
+        <div>
+          <p className="uppercase tracking-[0.16em] text-slate-500">Start bot</p>
+          <p className="mt-1 text-sm text-slate-200">{formatDateTime(row.startedAt)}</p>
+        </div>
+        <div>
+          <p className="uppercase tracking-[0.16em] text-slate-500">Ajout canal</p>
+          <p className="mt-1 text-sm text-slate-200">{row.joinedAt ? formatDateTime(row.joinedAt) : "Pas encore confirmé"}</p>
+        </div>
+        <div>
+          <p className="uppercase tracking-[0.16em] text-slate-500">Meta sent</p>
+          <p className="mt-1 text-sm text-slate-200">{formatDateTime(row.metaSubscribeSentAt)}</p>
+        </div>
+        <div>
+          <p className="uppercase tracking-[0.16em] text-slate-500">Campaign</p>
+          <p className="mt-1 truncate text-sm text-slate-200">{row.utmCampaign || "Direct / inconnu"}</p>
+        </div>
+        <div>
+          <p className="uppercase tracking-[0.16em] text-slate-500">Event ID</p>
+          <p className="mt-1 truncate text-sm text-slate-200">{row.metaSubscribeEventId || "—"}</p>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 function MetricCard({
   title,
   value,
@@ -565,7 +668,7 @@ export default function Dashboard() {
 
       if (!result.success) {
         toast.error("Save failed", {
-          description: "The Telegram link could not be updated right now.",
+          description: result.error || "The Telegram link could not be updated right now.",
         });
         return;
       }
@@ -774,20 +877,39 @@ export default function Dashboard() {
                     autoComplete="off"
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => void handleSaveTelegramGroupUrl()}
-                  disabled={updateSettingMutation.isPending || settingsQuery.isLoading}
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {updateSettingMutation.isPending ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" /> Saving latest changes...
-                    </>
-                  ) : (
-                    "Save latest changes"
-                  )}
-                </button>
+                <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveTelegramGroupUrl()}
+                    disabled={updateSettingMutation.isPending || settingsQuery.isLoading}
+                    className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-5 text-sm font-semibold text-slate-950 transition hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {updateSettingMutation.isPending ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Saving latest changes...
+                      </>
+                    ) : (
+                      "Save latest changes"
+                    )}
+                  </button>
+                  <a
+                    href={telegramGroupUrl || "#"}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-disabled={!telegramGroupUrl}
+                    onClick={(event) => {
+                      if (!telegramGroupUrl) event.preventDefault();
+                    }}
+                    className={`inline-flex h-12 items-center justify-center gap-2 rounded-2xl border px-4 text-sm font-medium transition ${
+                      telegramGroupUrl
+                        ? "border-cyan-500/40 text-cyan-200 hover:border-cyan-400"
+                        : "border-slate-700 text-slate-500 cursor-not-allowed"
+                    }`}
+                    title={telegramGroupUrl ? "Open the link in a new tab" : "Type a link first"}
+                  >
+                    Test link
+                  </a>
+                </div>
               </div>
             </Card>
             <Card className="lg:col-span-8 border-violet-500/40 bg-[radial-gradient(circle_at_top_left,rgba(168,85,247,0.16),transparent_42%),#111827] shadow-[0_0_0_1px_rgba(168,85,247,0.10),0_0_30px_rgba(59,130,246,0.08)]">
@@ -1120,62 +1242,7 @@ export default function Dashboard() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading bot-start diagnostics...
                   </div>
                 ) : subscriberLog.length > 0 ? (
-                  subscriberLog.map((row) => {
-                    const metaBadge = metaStatusBadge(row.metaSubscribeStatus);
-                    const sessionBadge = presenceBadge(row.sessionToken);
-                    const fbclidBadge = presenceBadge(row.fbclid);
-
-                    return (
-                      <div key={row.id} className="rounded-[18px] border border-slate-800 bg-slate-950/70 px-4 py-3">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-white">{formatSubscriberIdentity(row)}</p>
-                            <p className="mt-1 truncate text-sm text-slate-400">
-                              {row.telegramFirstName ? `${row.telegramFirstName} · ` : ""}
-                              {formatDateTime(row.startedAt)}
-                            </p>
-                          </div>
-                          <span
-                            className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${metaBadge.border} ${metaBadge.background} ${metaBadge.text}`}
-                          >
-                            <span className={`h-2 w-2 rounded-full ${metaBadge.dot}`} /> {metaBadge.label}
-                          </span>
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-400 sm:grid-cols-3 lg:grid-cols-6">
-                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
-                            <p className="uppercase tracking-[0.16em] text-slate-500">Start bot</p>
-                            <p className="mt-1 text-sm text-slate-200">{formatRelativeTime(row.startedAt)}</p>
-                          </div>
-                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
-                            <p className="uppercase tracking-[0.16em] text-slate-500">Ajout canal</p>
-                            <p className="mt-1 text-sm text-slate-200">{row.joinedAt ? formatDateTime(row.joinedAt) : "Pas encore confirmé"}</p>
-                          </div>
-                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
-                            <p className="uppercase tracking-[0.16em] text-slate-500">Meta</p>
-                            <p className="mt-1 text-sm text-slate-200">{metaBadge.label}</p>
-                          </div>
-                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
-                            <p className="uppercase tracking-[0.16em] text-slate-500">IP</p>
-                            <p className="mt-1 truncate font-mono text-sm text-slate-200" title={row.ipAddress || ""}>
-                              {row.ipAddress || "—"}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
-                            <p className="uppercase tracking-[0.16em] text-slate-500">Session token</p>
-                            <span className={`mt-1 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${sessionBadge.border} ${sessionBadge.background} ${sessionBadge.text}`}>
-                              <span className={`h-2 w-2 rounded-full ${sessionBadge.dot}`} /> {sessionBadge.label}
-                            </span>
-                          </div>
-                          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
-                            <p className="uppercase tracking-[0.16em] text-slate-500">FBCLID</p>
-                            <span className={`mt-1 inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${fbclidBadge.border} ${fbclidBadge.background} ${fbclidBadge.text}`}>
-                              <span className={`h-2 w-2 rounded-full ${fbclidBadge.dot}`} /> {fbclidBadge.label}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                  subscriberLog.map((row) => <SubscriberDiagnosticRow key={row.id} row={row} />)
                 ) : (
                   <p className="text-sm text-slate-400">No recent bot starts are available for diagnostics yet.</p>
                 )}
@@ -1196,56 +1263,7 @@ export default function Dashboard() {
                     <Loader2 className="h-4 w-4 animate-spin" /> Loading subscriber conversions...
                   </div>
                 ) : subscriberLog.length > 0 ? (
-                  subscriberLog.map((row) => {
-                    const badge = metaStatusBadge(row.metaSubscribeStatus);
-                    const attribution = formatSubscriberAttribution(row);
-
-                    return (
-                      <div
-                        key={row.id}
-                        className="rounded-[18px] border border-slate-800 bg-slate-950/70 px-4 py-3"
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-white">
-                              {formatSubscriberIdentity(row)}
-                            </p>
-                            <p className="mt-1 truncate text-sm text-slate-400">
-                              {row.telegramFirstName ? `${row.telegramFirstName} · ` : ""}
-                              {attribution || "Direct / unknown attribution"}
-                            </p>
-                          </div>
-                          <span
-                            className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${badge.border} ${badge.background} ${badge.text}`}
-                          >
-                            <span className={`h-2 w-2 rounded-full ${badge.dot}`} /> {badge.label}
-                          </span>
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-400 sm:grid-cols-3 lg:grid-cols-5">
-                          <div>
-                            <p className="uppercase tracking-[0.16em] text-slate-500">Start bot</p>
-                            <p className="mt-1 text-sm text-slate-200">{formatDateTime(row.startedAt)}</p>
-                          </div>
-                          <div>
-                            <p className="uppercase tracking-[0.16em] text-slate-500">Ajout canal</p>
-                            <p className="mt-1 text-sm text-slate-200">{row.joinedAt ? formatDateTime(row.joinedAt) : "Pas encore confirmé"}</p>
-                          </div>
-                          <div>
-                            <p className="uppercase tracking-[0.16em] text-slate-500">Meta sent</p>
-                            <p className="mt-1 text-sm text-slate-200">{formatDateTime(row.metaSubscribeSentAt)}</p>
-                          </div>
-                          <div>
-                            <p className="uppercase tracking-[0.16em] text-slate-500">Campaign</p>
-                            <p className="mt-1 truncate text-sm text-slate-200">{row.utmCampaign || "Direct / inconnu"}</p>
-                          </div>
-                          <div>
-                            <p className="uppercase tracking-[0.16em] text-slate-500">Event ID</p>
-                            <p className="mt-1 truncate text-sm text-slate-200">{row.metaSubscribeEventId || "—"}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })
+                  subscriberLog.map((row) => <SubscriberConversionRow key={row.id} row={row} />)
                 ) : (
                   <p className="text-sm text-slate-400">No bot-start conversions have been logged yet.</p>
                 )}

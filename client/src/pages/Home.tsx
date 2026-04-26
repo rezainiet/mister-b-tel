@@ -24,6 +24,10 @@ const telegramUrl = "https://t.me/MisterBNMB";
 const logoUrl =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663482010907/nmN5FRo8qmaVANQi8aWFsw/misterb-logo_21161f1e.jpeg";
 
+// NOTE: This is intentional demo / social-proof content, not real-time data.
+// Names and actions are illustrative — the rotation only animates the toast,
+// it does not reflect live joins. If you need real activity here, wire it to
+// the dashboard.subscriberLog tRPC query instead.
 const socialNotifications = [
   { id: "lucas-group", name: "Lucas", detail: "a rejoint le groupe privé" },
   { id: "mehdi-tg", name: "Mehdi", detail: "vient de cliquer sur Telegram" },
@@ -321,7 +325,15 @@ export default function Home() {
             label="Me contacter"
             icon="telegram"
             animationDelay="0.45s"
-            onTrack={() => trackTelegramClick("telegram_contact_cta")}
+            openInSameTab
+            onTrack={async (event) => {
+              event.preventDefault();
+              try {
+                await trackTelegramClick("telegram_contact_cta");
+              } finally {
+                window.location.assign(telegramUrl);
+              }
+            }}
           />
         </div>
 

@@ -14,7 +14,16 @@ import { setupTelegramWebhook } from "../telegramWebhook";
 import { startTelegramReminderWorker } from "../telegramReminders";
 
 function assertProductionEnv() {
-  if (process.env.NODE_ENV !== "production") return;
+  if (process.env.NODE_ENV !== "production") {
+    // Even in dev we refuse to start with a Telegram bot token but no webhook
+    // secret — the webhook would then be a public endpoint that anyone can
+    // forge bot starts through.
+    if (process.env.TELEGRAM_BOT_TOKEN && !process.env.TELEGRAM_WEBHOOK_SECRET) {
+      log.error("startup", "bot_token_without_webhook_secret");
+      throw new Error("TELEGRAM_BOT_TOKEN is set but TELEGRAM_WEBHOOK_SECRET is missing — refusing to start.");
+    }
+    return;
+  }
   const required: Record<string, string | undefined> = {
     DATABASE_URL: process.env.DATABASE_URL,
     JWT_SECRET: process.env.JWT_SECRET,

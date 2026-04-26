@@ -62,7 +62,7 @@ export type InsertTrackingEvent = typeof trackingEvents.$inferInsert;
  */
 export const dailyStats = mysqlTable("daily_stats", {
   id: int("id").autoincrement().primaryKey(),
-  date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
+  date: varchar("date", { length: 10 }).notNull().unique(), // YYYY-MM-DD; unique so recordEvent can use INSERT … ON DUPLICATE KEY UPDATE.
   pageviews: int("pageviews").default(0).notNull(),
   uniqueVisitors: int("uniqueVisitors").default(0).notNull(),
   whatsappClicks: int("whatsappClicks").default(0).notNull(),
