@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1776079248566,
+      "tag": "0000_glossy_cloak",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1776079477927,
+      "tag": "0001_brave_xavin",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1776707461523,
+      "tag": "0002_skinny_blazing_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1776716783099,
+      "tag": "0003_past_hawkeye",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1776882083857,
+      "tag": "0004_rare_zarek",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1777047264721,
+      "tag": "0005_tricky_katie_power",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1777139356546,
+      "tag": "0006_harsh_barracuda",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1798041600000,
+      "tag": "0007_funnel_hardening",
+      "breakpoints": true
+    }
+  ]
+}

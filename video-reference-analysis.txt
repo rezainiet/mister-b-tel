@@ -1,0 +1,104 @@
+Starting video analysis...
+Submitting video analysis task...
+Task submitted (ID: video-analysis-f644b808-5416-41c8-ad9f-10306aaf4b53)
+[8s] Status: Analyzing video content with AI...
+[33s] Still processing, please wait...
+[40s] Status: Analysis completed
+[40s] Analysis completed!
+Full analysis result saved to: /home/ubuntu/video_ScreenRecording_04-13-202613-59-59_1_analysis_20260413_081634.md
+Note: This tool performs AI-based visual and audio analysis, not verbatim transcription. For detailed speech transcription, use `manus-speech-to-text` instead.
+Analysis result:
+
+Voici une description détaillée et structurée de l'interface utilisateur (UI) du tableau de bord "Prestige Tracker", conçue pour être directement exploitable par un développeur frontend pour une reproduction fidèle (intégration HTML/CSS/JS ou framework type React/Vue).
+
+L'interface est présentée dans une vue mobile (colonne unique).
+
+---
+
+### 1. Thème Global et Design System (UI/UX)
+
+*   **Mode :** Dark Mode (Thème sombre) exclusif.
+*   **Arrière-plan principal (Body) :** Bleu nuit très profond/Gris anthracite foncé (ex: `#111827` ou `#0f172a`).
+*   **Arrière-plan des cartes (Cards) :** Légèrement plus clair que le fond principal pour créer du contraste (ex: `#1e293b`).
+*   **Typographie :** Police sans-serif moderne, propre et géométrique (type Inter, Roboto ou Poppins).
+*   **Rayons d'angle (Border-radius) :** Très prononcés. Les cartes et les boutons ont des angles arrondis généreux, estimés à `12px` ou `16px`.
+*   **Bordures et Ombres :** Les cartes ont une bordure très fine (1px) et subtile, d'une couleur légèrement plus claire que leur fond. Pas d'ombres portées (box-shadow) massives, le design repose sur le "flat dark" avec des bordures pour délimiter les blocs.
+*   **Palette de couleurs d'accentuation (Variables sémantiques) :**
+    *   **Texte principal :** Blanc pur (`#ffffff`) ou gris très clair.
+    *   **Texte secondaire (Labels/Sous-titres) :** Gris moyen/clair (ex: `#9ca3af`).
+    *   **Titre principal & En-têtes de sections :** Jaune/Or (`#eab308`).
+    *   **Statut Actif / WhatsApp :** Vert vif/Néon (`#22c55e`).
+    *   **Vues Landing / Scroll :** Violet clair/Mauve (`#a855f7`).
+    *   **Visiteurs Uniques :** Cyan/Bleu clair (`#06b6d4`).
+    *   **Telegram :** Bleu standard (`#3b82f6`).
+    *   **Bouton Déconnexion :** Rouge (`#ef4444`).
+
+---
+
+### 2. En-tête (Header) & Contrôles
+
+L'en-tête est situé en haut de la page et semble défiler avec le contenu.
+
+*   **Titre du Dashboard :**
+    *   Texte : "Prestige Tracker" (Gras, couleur Jaune/Or, taille de police moyenne-grande).
+    *   Sous-titre : "prest-ige.co - Real-time Dashboard" (Gris, taille petite, police régulière).
+*   **Barre d'outils (Filtres et Actions) :** Disposition en ligne (Flexbox row), avec un espace entre les éléments (gap).
+    *   **Bouton Langue :** Icône drapeau français + "FR". Fond sombre, bordure fine, coins arrondis.
+    *   **Filtre Temporel (Dropdown) :** Bouton affichant "Since midnight" avec une icône chevron bas.
+        *   *Comportement :* Au clic, un menu déroulant natif (ou stylisé façon OS) s'ouvre. Fond blanc, texte noir.
+        *   *Options visibles :* "Since midnight" (sélectionné), "48h", "7 days", "14 days", "30 days", "90 days".
+    *   **Bouton Rafraîchir :** Icône de boucle de rafraîchissement + "Refresh". Même style que les autres boutons.
+*   **Bouton "Logout" :** Situé sous la barre d'outils, aligné à gauche. Style "Outline" : fond transparent, bordure rouge fine, texte rouge.
+
+---
+
+### 3. Structure du Dashboard (Main Content - Ordre des Cartes)
+
+Le contenu principal est une pile verticale (Flexbox column) de cartes (Cards). Chaque carte occupe toute la largeur disponible avec des marges latérales (padding global du conteneur d'environ `16px`).
+
+#### Carte 1 : Le Bloc "AD STATUS" (Mise en avant)
+C'est la carte la plus visuelle.
+*   **Style spécifique :** Possède une bordure lumineuse (glow effect) de couleur verte.
+*   **En-tête de carte :** Un gros point vert (pastille) suivi du texte "AD STATUS" (gris, majuscules, petit). En dessous, le texte "Ad active" en très gros, gras et vert vif.
+*   **Corps de carte (Grille 3 colonnes) :**
+    *   *Colonne 1 :* Chiffre "10" (Gros, vert) / Sous-titre "visits (5 min)" (Petit, gris).
+    *   *Colonne 2 :* Chiffre "50" (Gros, vert) / Sous-titre "visits (4h)" (Petit, gris).
+    *   *Colonne 3 :* Titre "Last visit" (Petit, gris) / Valeur "2 min ago" (Moyen, blanc, gras).
+
+#### Cartes 2 à 6 : Les KPIs Principaux (Métriques Uniques)
+Structure identique pour ces 5 cartes : Un titre en haut à gauche (petit, gris), une valeur numérique centrale (très grande, grasse, colorée), un sous-titre en bas à gauche (petit, gris).
+*   **Carte 2 - Landing Page Visits :** Valeur "456" (Violet). Sous-titre : "Total pageviews".
+*   **Carte 3 - Unique Visitors :** Valeur "454" (Cyan). Sous-titre : "Different people".
+*   **Carte 4 - WhatsApp Clicks :** Valeur "60" (Vert). Sous-titre : "Channel clicks".
+*   **Carte 5 - Telegram Clicks :** Valeur "5" (Bleu). Sous-titre : "Private contacts".
+*   **Carte 6 - Conversion Rate :** Valeur "14.3%" (Jaune). Sous-titre : "Visits -> Clicks".
+
+#### Cartes 7 à 10 : Statistiques de Scroll
+Structure identique aux KPIs précédents, mais regroupant les données de profondeur de défilement. La couleur de la valeur est toujours **Violette**.
+*   **Carte 7 :** Titre "Scroll 25%" / Valeur "87" / Sous-titre "Saw the beginning".
+*   **Carte 8 :** Titre "Scroll 50%" / Valeur "44" / Sous-titre "Saw half".
+*   **Carte 9 :** Titre "Scroll 75%" / Valeur "27" / Sous-titre "Saw almost all".
+*   **Carte 10 :** Titre "Scroll 100%" / Valeur "17" / Sous-titre "Saw everything".
+
+#### Carte 11 : Graphique "Daily Traffic"
+*   **En-tête :** Icône de graphique ascendant + Titre "Daily Traffic" (Jaune, gras).
+*   **Zone du Graphique :** Graphique de type ligne/points (Line chart).
+    *   Axe Y : Valeurs 0, 150, 300, 450, 600. Lignes de grille horizontales en pointillés très subtils.
+    *   Axe X : Date "04-13".
+    *   Données : Un point Violet (haut, ~450), un point Vert (bas, ~60), un point Bleu (très bas, ~5).
+*   **Légende (en bas) :** Alignée horizontalement. Point Violet + "Visits" | Point Vert + "WhatsApp" | Point Bleu + "Telegram".
+
+#### Carte 12 : Tableau "Daily Breakdown"
+*   **En-tête :** Icône calendrier + Titre "Daily Breakdown" (Jaune, gras).
+*   **Structure :** Tableau HTML classique ou Grid.
+    *   *En-têtes de colonnes (Gris, petit) :* Date, Visits, Unique Visitors, WhatsApp, Telegram.
+    *   *Ligne de données :* "2024-04-13" (Gris), "457" (Violet), "455" (Cyan), "60" (Vert), "5" (Bleu). *Note : Les couleurs des chiffres correspondent sémantiquement aux couleurs des KPIs des cartes précédentes.*
+
+#### Carte 13 : Flux "Recent Events" (Comportements Live)
+*   **En-tête :** Pastille rouge (qui semble indiquer le "Live") + Titre "Recent Events" (Jaune, gras).
+*   **Liste d'événements :** Liste verticale (ul/li). Chaque ligne représente un événement récent.
+    *   *Structure d'une ligne (Flexbox row, space-between) :*
+        *   **Gauche :** Une pastille de couleur indiquant le type d'événement (Violet pour Page view/Scroll, Cyan pour New visitor).
+        *   **Centre (collé à la pastille) :** Nom de l'événement en blanc gras (ex: "Page view", "New visitor", "Scroll 50%") suivi de la source en gris régulier (ex: "via landing", "via scroll").
+        *   **Droite :** Timestamp (Gris, aligné à droite). Ex: "just now", "3 min ago".
+    *   *Ordre :* Chronologique inversé (les plus récents en haut). L'espacement entre chaque ligne (padding vertical) est régulier et aéré (environ `12px` ou `16px`).

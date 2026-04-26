@@ -1,0 +1,232 @@
+diff --git a/client/src/lib/tracking.ts b/client/src/lib/tracking.ts
+index 48c9cec..0f25426 100644
+--- a/client/src/lib/tracking.ts
++++ b/client/src/lib/tracking.ts
+@@ -3,6 +3,7 @@ export type TrackingSession = {
+   telegramBotUrl: string;
+   telegramDeepLink: string;
+   payload: string;
++  testEventCode?: string;
+ };
+ 
+ type MetaWindow = Window & {
+@@ -11,6 +12,7 @@ type MetaWindow = Window & {
+ 
+ const STORAGE_KEY = "misterb_tracking_session_v2";
+ const VISITOR_STORAGE_KEY = "misterb_vid";
++const META_TEST_CODE_STORAGE_KEY = "misterb_meta_test_event_code";
+ const BOT_USERNAME = "Misternb_bot";
+ export const TELEGRAM_BOT_URL = `https://t.me/${BOT_USERNAME}`;
+ export const TELEGRAM_BOT_DEEP_LINK = `tg://resolve?domain=${BOT_USERNAME}`;
+@@ -33,6 +35,20 @@ function getFbclid() {
+   return new URLSearchParams(window.location.search).get("fbclid") || undefined;
+ }
+ 
++function getMetaTestCode() {
++  if (typeof window === "undefined") return undefined;
++
++  const params = new URLSearchParams(window.location.search);
++  const fromQuery = params.get("meta_test_code") || undefined;
++
++  if (fromQuery) {
++    window.sessionStorage.setItem(META_TEST_CODE_STORAGE_KEY, fromQuery);
++    return fromQuery;
++  }
++
++  return window.sessionStorage.getItem(META_TEST_CODE_STORAGE_KEY) || undefined;
++}
++
+ function getCurrentUtmParams() {
+   if (typeof window === "undefined") {
+     return {
+@@ -141,6 +157,7 @@ async function postTrackingRecord(input: {
+             sourceUrl: input.sourceUrl || (typeof window !== "undefined" ? window.location.href : undefined),
+             fbc: getFbcValue(),
+             fbp: getFbpValue(),
++            testEventCode: getMetaTestCode(),
+           },
+         },
+       }),
+@@ -158,7 +175,10 @@ async function createTrackingSession(): Promise<TrackingSession | null> {
+       credentials: "include",
+       body: JSON.stringify({
+         0: {
+-          json: getCurrentUtmParams(),
++          json: {
++            ...getCurrentUtmParams(),
++            testEventCode: getMetaTestCode(),
++          },
+         },
+       }),
+     });
+diff --git a/server/facebookCapi.ts b/server/facebookCapi.ts
+index e7782f9..723bb26 100644
+--- a/server/facebookCapi.ts
++++ b/server/facebookCapi.ts
+@@ -13,6 +13,7 @@ type ConversionPayload = {
+   country?: string;
+   source?: string;
+   customData?: Record<string, unknown>;
++  testEventCode?: string;
+ };
+ 
+ const META_PIXEL_ID = process.env.META_PIXEL_ID ?? "";
+@@ -96,6 +97,7 @@ export async function sendCapiEvent(
+       },
+     ],
+     access_token: META_CONVERSIONS_TOKEN,
++    test_event_code: payload.testEventCode || undefined,
+   };
+ 
+   try {
+diff --git a/server/meta.credentials.test.ts b/server/meta.credentials.test.ts
+index b0d39be..8d5f5da 100644
+--- a/server/meta.credentials.test.ts
++++ b/server/meta.credentials.test.ts
+@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
+ 
+ const clientHtml = readFileSync(resolve(import.meta.dirname, "../client/index.html"), "utf8");
+ const trackingSource = readFileSync(resolve(import.meta.dirname, "../client/src/lib/tracking.ts"), "utf8");
++const routerSource = readFileSync(resolve(import.meta.dirname, "./routers.ts"), "utf8");
+ const pageViewSource = readFileSync(resolve(import.meta.dirname, "./facebookCapi.ts"), "utf8");
+ const subscribeSource = readFileSync(resolve(import.meta.dirname, "./metaCapi.ts"), "utf8");
++const webhookSource = readFileSync(resolve(import.meta.dirname, "./telegramWebhook.ts"), "utf8");
+ 
+ describe("Meta server-only wiring", () => {
+   it("keeps the landing bootstrap limited to server-side identifiers and does not load the browser Meta pixel", () => {
+@@ -25,8 +27,14 @@ describe("Meta server-only wiring", () => {
+     expect(trackingSource).toContain('const stored = sessionStorage.getItem("misterb_pv_event_id")');
+     expect(trackingSource).toContain('const bootstrappedPageViewEventId = getBootstrappedPageViewEventId()');
+     expect(trackingSource).toContain('const pageViewEventId = bootstrappedPageViewEventId || randomId("pv")');
++    expect(trackingSource).toContain('const fromQuery = params.get("meta_test_code") || undefined');
++    expect(trackingSource).toContain('testEventCode: getMetaTestCode()');
+     expect(trackingSource).not.toContain("trackBrowserPageView");
+     expect(trackingSource).toContain('eventId: pageViewEventId');
++    expect(routerSource).toContain('testEventCode: z.string().optional()');
++    expect(routerSource).toContain('const payload = encodeTelegramStartPayload(sessionToken, "group", input.testEventCode)');
++    expect(routerSource).toContain('testEventCode: input.testEventCode');
++    expect(pageViewSource).toContain('test_event_code: payload.testEventCode || undefined');
+     expect(pageViewSource).toContain("process.env.META_CONVERSIONS_TOKEN");
+     expect(pageViewSource).toContain("process.env.META_PIXEL_ID");
+     expect(subscribeSource).toContain("process.env.META_CONVERSIONS_TOKEN");
+@@ -34,5 +42,7 @@ describe("Meta server-only wiring", () => {
+     expect(subscribeSource).toContain('value: "0.00"');
+     expect(subscribeSource).toContain('currency: "EUR"');
+     expect(subscribeSource).toContain('predicted_ltv: "0.00"');
++    expect(webhookSource).toContain('const startMetaTestCode = decodedPayload?.testEventCode');
++    expect(webhookSource).toContain('testEventCode: startMetaTestCode');
+   });
+ });
+diff --git a/server/routers.ts b/server/routers.ts
+index 2ed60ae..59ff8b7 100644
+--- a/server/routers.ts
++++ b/server/routers.ts
+@@ -35,8 +35,17 @@ function randomSessionToken() {
+   return crypto.randomBytes(24).toString("hex");
+ }
+ 
+-function encodeTelegramStartPayload(sessionToken: string, type = "group") {
+-  return Buffer.from(`${type}:${sessionToken}`, "utf-8")
++function encodeTelegramStartPayload(
++  sessionToken: string,
++  type = "group",
++  metaTestCode?: string,
++) {
++  const payloadParts = [type, sessionToken];
++  if (metaTestCode) {
++    payloadParts.push(encodeURIComponent(metaTestCode));
++  }
++
++  return Buffer.from(payloadParts.join(":"), "utf-8")
+     .toString("base64")
+     .replace(/\+/g, "-")
+     .replace(/\//g, "_")
+@@ -90,11 +99,12 @@ export const appRouter = router({
+           landingPage: z.string().optional(),
+           referrer: z.string().optional(),
+           isMobile: z.boolean().optional(),
++          testEventCode: z.string().optional(),
+         }),
+       )
+       .mutation(async ({ input, ctx }) => {
+         const sessionToken = randomSessionToken();
+-        const payload = encodeTelegramStartPayload(sessionToken, "group");
++        const payload = encodeTelegramStartPayload(sessionToken, "group", input.testEventCode);
+         const telegramBotUrl = `https://t.me/${BOT_USERNAME}?start=${payload}`;
+         const userAgent = getHeaderString(ctx.req.headers["user-agent"]);
+         const forwardedFor = getHeaderString(ctx.req.headers["x-forwarded-for"]);
+@@ -157,6 +167,7 @@ export const appRouter = router({
+           fbc: z.string().optional(),
+           fbp: z.string().optional(),
+           country: z.string().optional(),
++          testEventCode: z.string().optional(),
+         }),
+       )
+       .mutation(async ({ input, ctx }) => {
+@@ -188,6 +199,7 @@ export const appRouter = router({
+           fbp: input.fbp,
+           country: input.country,
+           source: input.eventSource || "button",
++          testEventCode: input.testEventCode,
+         };
+ 
+         if (input.eventType === "pageview") {
+diff --git a/server/telegramWebhook.ts b/server/telegramWebhook.ts
+index 833632f..64e238c 100644
+--- a/server/telegramWebhook.ts
++++ b/server/telegramWebhook.ts
+@@ -74,13 +74,19 @@ interface TelegramUpdate {
+   my_chat_member?: TelegramChatMemberUpdate;
+ }
+ 
+-function decodeStartPayload(payload: string): { sessionToken: string; type: string } | null {
++function decodeStartPayload(
++  payload: string,
++): { sessionToken: string; type: string; testEventCode?: string } | null {
+   try {
+     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+     const decoded = Buffer.from(base64, "base64").toString("utf-8");
+     const parts = decoded.split(":");
+     if (parts.length >= 2) {
+-      return { type: parts[0] || "group", sessionToken: parts.slice(1).join(":") };
++      return {
++        type: parts[0] || "group",
++        sessionToken: parts[1] || "",
++        testEventCode: parts[2] ? decodeURIComponent(parts.slice(2).join(":")) : undefined,
++      };
+     }
+     return null;
+   } catch {
+@@ -203,12 +209,11 @@ export function setupTelegramWebhook(app: Express) {
+     if (messageText.startsWith("/start") && telegramMessage?.from) {
+       const payload = telegramMessage.text?.split(" ")[1] || null;
+       const userId = String(telegramMessage.from.id);
++      const decodedPayload = payload ? decodeStartPayload(payload) : null;
++      const startMetaTestCode = decodedPayload?.testEventCode;
+ 
+-      if (payload) {
+-        const decoded = decodeStartPayload(payload);
+-        if (decoded?.sessionToken) {
+-          pendingJoinSessions.set(userId, decoded.sessionToken);
+-        }
++      if (decodedPayload?.sessionToken) {
++        pendingJoinSessions.set(userId, decodedPayload.sessionToken);
+       }
+ 
+       await upsertBotStart({
+@@ -248,6 +253,7 @@ export function setupTelegramWebhook(app: Express) {
+             utmContent: startSession?.utmContent || undefined,
+             userAgent: ua || undefined,
+             ipAddress: ip || undefined,
++            testEventCode: startMetaTestCode,
+           });
+           await updateBotStartMetaStatus(
+             userId,
+@@ -267,6 +273,7 @@ export function setupTelegramWebhook(app: Express) {
+             telegramUsername: telegramMessage.from.username,
+             userAgent: ua || undefined,
+             ipAddress: ip || undefined,
++            testEventCode: startMetaTestCode,
+           });
+           await updateBotStartMetaStatus(
+             userId,

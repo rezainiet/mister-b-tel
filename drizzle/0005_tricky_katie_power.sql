@@ -1,0 +1,1 @@
+ALTER TABLE `utm_sessions` ADD `fbp` varchar(512);

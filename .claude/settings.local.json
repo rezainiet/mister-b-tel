@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm --version)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm dev *)",
+      "Bash(NODE_ENV=development npx tsx *)",
+      "Bash(curl *)",
+      "Bash(docker --version)",
+      "Bash(pnpm add *)",
+      "Bash(pnpm check *)",
+      "Bash(node_modules/.bin/vitest run *)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(DASHBOARD_PASSWORD=1234 JWT_SECRET=test-secret-for-vitest-1234567890 META_PIXEL_ID=945883278158292 META_CONVERSIONS_TOKEN=dummy node_modules/.bin/vitest run --reporter=basic)",
+      "Bash(echo \"tsc exit=$?\")",
+      "Bash(node *)",
+      "Bash(echo \"tsc=$?\")",
+      "Bash(DASHBOARD_PASSWORD=1234 JWT_SECRET=test-secret-for-vitest-1234567890 META_PIXEL_ID=945883278158292 META_CONVERSIONS_TOKEN=dummy node_modules/.bin/vitest run server/telegramWebhookHardening.test.ts --reporter=verbose)",
+      "Bash(DASHBOARD_PASSWORD=1234 JWT_SECRET=test-secret-for-vitest-1234567890 META_PIXEL_ID=945883278158292 META_CONVERSIONS_TOKEN=dummy node_modules/.bin/vitest run server/misterb.dashboard.test.ts -t \"records pageviews\" --reporter=verbose)",
+      "Bash(DASHBOARD_PASSWORD=1234 JWT_SECRET=test-secret-for-vitest-1234567890 META_PIXEL_ID=945883278158292 META_CONVERSIONS_TOKEN=dummy node_modules/.bin/vitest run server/funnelHardening.test.ts server/telegramWebhookHardening.test.ts server/clientTracking.test.ts server/dashboardAuth.test.ts server/metaWorker.test.ts --reporter=basic)"
+    ]
+  }
+}

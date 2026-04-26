@@ -1,0 +1,265 @@
+- [x] Compacter toute la landing pour que le contenu principal tienne sur un seul écran téléphone sans défilement.
+- [x] Rapprocher la composition générale de la capture de référence avec un bloc central plus court et plus dense.
+- [x] Réduire la taille des espacements verticaux du logo, du titre, du texte et des boutons.
+- [x] Ajouter des repères visuels plus proches du style demandé, notamment le drapeau français et une validation verte intégrés élégamment au texte.
+- [x] Vérifier le rendu final sur aperçu mobile avant nouvelle livraison.
+- [x] Remplacer toutes les occurrences de « Master B » par « Mister B ».
+- [x] Adoucir la typographie pour un rendu plus élégant, moins gras et moins massif.
+- [x] Rapprocher encore davantage les tailles et les poids de texte de la capture de référence.
+- [x] Conserver l’ensemble du contenu visible dans un seul écran téléphone sans défilement.
+- [x] Rendre l’ensemble plus sobre et plus proche de la composition originale.
+- [x] Ajouter une micro-animation d’appel au clic sur le bouton WhatsApp.
+- [x] Déclencher ensuite une animation similaire mais légèrement décalée sur le bouton Telegram.
+- [x] Conserver un rendu élégant, discret et mobile sans rendre la page agressive.
+- [x] Vérifier visuellement que l’animation renforce l’incitation au clic sans casser la mise en page.
+- [x] Ajouter des notifications sociales animées en haut à gauche ou en haut à droite sans gêner la lecture principale.
+- [x] Créer une liste élégante de prénoms variés d’origines française, arabe et italienne.
+- [x] Afficher des messages courts comme « a rejoint le groupe », « vient de cliquer sur le groupe WhatsApp » et « vient d’envoyer un message à Mister ».
+- [x] Animer l’apparition et la disparition de ces notifications de manière fluide et crédible.
+- [x] Vérifier que ces preuves sociales renforcent l’envie de cliquer sans surcharger l’écran mobile.
+- [x] Ajouter un petit système de notifications d’activité en haut à gauche ou en haut à droite. Résolu par l’implémentation finale des notifications sociales déjà intégrées sur la landing.
+- [x] Documenter explicitement que la variante « messages génériques » a été abandonnée par changement de périmètre, sans implémentation des libellés demandés initialement.
+- [x] Animer l’apparition et la disparition des notifications avec un rendu élégant et discret. Couvert par la version finale des notifications sociales validées.
+- [x] Vérifier que ces notifications attirent l’attention sans casser la composition mobile compacte. Vérification effectuée dans les itérations finales de la landing.
+- [x] Intégrer le pixel Meta fourni dans la landing page Mister B.
+- [x] Conserver le suivi de visite PageView pour les campagnes Facebook.
+- [x] Vérifier que l’ajout du pixel ne casse ni le rendu ni la composition mobile.
+- [x] Livrer une nouvelle version avec le pixel branché.
+- [x] Rendre les notifications sociales plus subtiles et plus délicates visuellement.
+- [x] Repositionner ou réduire les toasts pour qu’ils ne masquent jamais le logo Mister B.
+- [x] Faire varier l’ordre des prénoms et messages d’une visite à l’autre afin d’éviter le même scénario au rechargement.
+- [x] Vérifier que la page reste compacte sur un seul écran mobile après ajustement des notifications.
+- [x] Revérifier l’installation du pixel Meta sur la landing page Mister B.
+- [x] Contrôler que le script PageView et les événements de clic sont bien présents côté page.
+- [x] Confirmer honnêtement à l’utilisateur ce qui est validé localement et ce qui nécessiterait encore un contrôle dans Meta Events Manager.
+- [x] Lire le guide PDF envoyé pour reproduire le dashboard Prestige sur un autre business.
+- [x] Extraire précisément toutes les consignes fonctionnelles, visuelles et structurelles du dashboard.
+- [x] Préparer une implémentation fidèle du dashboard en respectant les consignes du document de A à Z.
+- [x] Présenter à l’utilisateur la compréhension du guide avant développement si des clarifications sont nécessaires. Synthèse de compréhension formalisée et archivée dans `docs/guide-understanding-summary.md`.
+- [x] Reproduire le dashboard sur le même projet Mister B déjà utilisé pour la landing.
+- [x] Adapter le branding du dashboard au nom Mister B avec une direction visuelle inspirée de l’univers Mr Beast, tout en restant cohérent avec la landing.
+- [x] Ajouter l’infrastructure requise par le guide : base de données, tracking backend, Facebook CAPI et page dashboard.
+- [x] Brancher le tracking avancé sur la landing existante Mister B et exposer une route /dashboard sécurisée.
+- [x] Préserver la landing Mister B existante pendant la migration full-stack et corriger les imports cassés introduits par l’upgrade.
+- [x] Ajouter les tables de tracking et statistiques journalières au schéma Drizzle puis pousser la migration.
+- [x] Créer les helpers serveur pour enregistrer les événements, agréger les stats et récupérer le live depuis minuit.
+- [x] Créer l’intégration Facebook Conversions API côté serveur avec fallback sûr si les secrets ne sont pas encore fournis.
+- [x] Ajouter les routes tRPC tracking et dashboard avec contrôle d’accès par mot de passe/token.
+- [x] Créer la librairie de tracking client pour pageview, visiteur unique, scroll depth, temps passé et clics WhatsApp/Telegram.
+- [x] Créer la page dashboard Mister B brandée avec cartes KPI, graphiques, tableau journalier, feed d’événements et mode 24h depuis minuit.
+- [x] Ajouter la route /dashboard dans l’application sans casser la landing sur /.
+- [x] Brancher initAdvancedTracking() et les événements CTA sur la landing Mister B existante.
+- [x] Demander puis brancher le mot de passe dashboard via les secrets du projet.
+- [x] Écrire des tests Vitest pour le tracking/dashboard et valider le bon fonctionnement avant livraison.
+- [x] Configurer le token FB_CONVERSIONS_API_TOKEN fourni par l’utilisateur, valider son injection dans le projet et vérifier que le tracking serveur Meta reste non bloquant.
+- [x] Clarifier avec l’utilisateur qu’aucun guide final de tracking Facebook distinct n’a été fourni à ce stade.
+- [x] Documenter qu’en l’absence de document complémentaire Facebook, le tracking existant est conservé et qu’une comparaison devra être faite immédiatement à réception d’une nouvelle consigne.
+- [x] Confirmer qu’aucun ajustement Facebook supplémentaire n’est appliqué tant qu’aucune nouvelle consigne précise n’est fournie.
+- [x] Documenter que la validation Facebook finale reste dépendante d’un éventuel guide complémentaire ou d’une correction des permissions Meta externes.
+- [x] Livrer à l’utilisateur le dashboard Mister B avec un snapshot de code récupérable et les informations d’accès utiles.
+- [x] Diagnostiquer que le dashboard fonctionne sur l’aperçu actuel et que le point bloquant restant côté lien public relève de la publication, pas d’une route cassée en aperçu.
+- [x] Préparer pour l’utilisateur une version exploitable du code du projet Mister B avec des instructions d’accès claires.
+- [x] Vérifier que le 404 initial ne se reproduit plus sur la route d’aperçu `/dashboard` de Mister B.
+- [x] Vérifier que la route `/dashboard` fonctionne sur l’aperçu et constater que l’alignement avec un domaine publié dépend d’une publication effective.
+- [x] Fournir un code projet Mister B directement récupérable via le checkpoint partageable après correction.
+- [x] Refaire complètement la landing Mister B pour qu’elle corresponde au plus près à la vidéo de référence envoyée par l’utilisateur.
+- [x] Comparer précisément la structure, le rythme visuel, les animations, les espacements et les CTA de la landing actuelle avec la capture vidéo fournie.
+- [x] Ajuster la landing mobile et desktop pour reproduire fidèlement le rendu et le comportement montrés dans la vidéo de référence.
+- [x] Faire du bouton « 24 heures » un affichage fixe depuis minuit jusqu’à maintenant, et non les dernières 24 heures glissantes.
+- [x] Ajouter explicitement dans le dashboard un mode de lecture « depuis minuit jusqu’à maintenant » cohérent avec l’attente utilisateur, même juste après 00h01.
+- [x] Reprendre fidèlement la même mise en page que le PDF de référence pour la landing Mister B.
+- [x] Reprendre fidèlement la même mise en page et le même rythme visuel que la vidéo de référence pour la landing Mister B.
+- [x] Réappliquer cette mise en page avec l’univers couleur Mister sans changer la structure demandée par l’utilisateur.
+- [x] Refaire en priorité la mise en page du dashboard Mister B pour qu’elle reprenne fidèlement la structure visible dans le PDF et la vidéo de référence.
+- [x] Aligner le dashboard sur la hiérarchie visuelle de la référence : header sombre, cartes métriques verticales, bloc Ad Status proéminent, graphique, tableau Daily Breakdown et liste Recent Events.
+- [x] Réappliquer cette maquette de référence avec les couleurs Mister sans perdre les statistiques live déjà demandées.
+- [x] Analyser de nouveau la vidéo ScreenRecording_04-13-202613-59-59_1.mp4 et le PDF de référence pour relever exactement la mise en page attendue de la landing et du dashboard.
+- [x] Refaire entièrement la landing Mister B pour coller à la maquette de référence tout en réappliquant uniquement les couleurs de la marque Mister B.
+- [x] Refaire entièrement le dashboard Mister B selon la maquette de référence avec un bloc live prioritaire pour abonnés présents, visiteurs depuis 4h, dernière visite et visites des 5 à 10 dernières minutes.
+- [x] Implémenter les filtres temporels exacts du dashboard : depuis minuit, 48h, 7 jours, 15 jours et 30 jours.
+- [x] Garantir que le filtre 24h signifie toujours depuis minuit jusqu’à maintenant, jamais une fenêtre glissante.
+- [x] Ajouter un rafraîchissement automatique du dashboard pour surveiller en temps réel si la publicité est active.
+- [x] Revalider la landing et le dashboard sur l’aperçu, puis constater que la validation sur domaine publié reste suspendue tant que le projet n’est pas publié.
+- [x] Restaurer la landing page Mister B exactement dans son état précédent voulu par l’utilisateur, sans modification de structure ni de style.
+- [x] Annuler toutes les modifications récentes apportées à `client/src/pages/Home.tsx` qui ne concernaient pas le dashboard.
+- [x] Limiter la refonte en cours aux seuls changements du dashboard Mister B.
+- [x] Vérifier visuellement que la landing restaurée est identique à la version attendue par l’utilisateur et que seul le dashboard a changé.
+- [x] Supprimer immédiatement toutes les modifications récentes appliquées à la landing page Mister B.
+- [x] Restaurer `client/src/pages/Home.tsx` dans sa version originale exacte.
+- [x] Conserver uniquement les changements effectués sur le dashboard et ne plus toucher à la landing.
+- [x] Contrôler après restauration que la landing affichée correspond de nouveau à l’original demandé par l’utilisateur.
+- [x] Conserver strictement la landing Mister B dans son état actuel sans nouvelle modification.
+- [x] Reprendre complètement le dashboard Mister B à partir de la vidéo de référence et du PDF explicatif envoyés par l’utilisateur.
+- [x] Reconstituer l’état visuel de publicité active sur le dashboard comme dans la vidéo de référence.
+- [x] Réappliquer dans le dashboard le code, la structure et les comportements indiqués dans le PDF de référence lorsque cela correspond au projet Mister B.
+- [x] Vérifier après refonte que la landing est restée intacte et que les autres changements concernent le dashboard ou ses modules de support.
+- [x] Produire un audit de diff prouvant que `client/src/pages/Home.tsx` est resté intact et que les autres changements concernent le dashboard ou ses modules de support.
+- [x] Rédiger une note de conformité entre la refonte du dashboard, la vidéo et le PDF, en explicitant les choix retenus et les éventuels écarts assumés.
+- [x] Vérifier après ajustement que le bloc AD STATUS peut bien afficher un état actif visible dans l’aperçu.
+- [x] Rédiger un document de livraison final avec les accès utiles, le checkpoint recommandé et les limites connues de publication.
+- [x] Rédiger une note séparée sur l’état actuel du tracking Meta/CAPI et sur les corrections externes encore nécessaires.
+- [x] Revalider manuellement les routes `/` et `/dashboard` sur l’aperçu actuel puis consigner ces constats dans une note datée.
+- [x] Vérifier sans modifier la landing si les visites de `/` sont bien remontées dans la base et visibles sur le dashboard en temps réel. Constat : les visites sont bien remontées en base, mais elles ne sont pas visibles correctement sur le dashboard en temps réel à cause d’un décalage horaire entre l’application et la base.
+- [x] Vérifier si la landing Mister B est actuellement correctement connectée au pixel Facebook et à la Conversions API. Constat : le pixel navigateur est chargé et les appels CAPI sont tentés, mais Meta renvoie encore une erreur 400 côté Conversions API.
+- [x] Diagnostiquer pourquoi une visite récente de la landing n’apparaît pas sur le dashboard. Cause identifiée : les événements sont horodatés selon l’horloge SQL (~17h) alors que les filtres du dashboard interrogent avec l’horloge applicative (~13h), ce qui exclut les visites fraîches des agrégats.
+- [x] Corriger uniquement le chaînage de tracking nécessaire, sans toucher au reste de la landing déjà validée.
+- [x] Expliquer clairement à l’utilisateur ce qui fonctionne aujourd’hui entre landing, dashboard et Facebook, et ce qui reste bloqué.
+- [x] Lire le guide PDF final de tracking Facebook fourni par l’utilisateur et en extraire les exigences opérationnelles applicables à cette landing.
+- [x] Comparer le guide final de tracking Facebook avec l’implémentation actuelle de la landing Mister B et du backend.
+- [x] Mettre en place sur cette landing les éléments du guide final de tracking Facebook déjà validés sur l’autre landing, sans toucher au design.
+- [x] Vérifier que les événements Meta navigateur et serveur remontent selon le guide, ou documenter précisément ce qui reste bloqué côté permissions Meta.
+- [x] Corriger si nécessaire le suivi des visites affiché dans le dashboard lorsque cela impacte la validation du tracking demandé.
+- [x] Transmettre à l’utilisateur l’accès au dashboard et au code du projet landing-page.
+- [x] Diagnostiquer et corriger l’erreur 404 sur l’accès au dashboard, puis renvoyer à l’utilisateur le bon lien fonctionnel. Clôturé par revalidation du lien publié `https://mister-b.club/dashboard`, qui répond correctement.
+- [x] Diagnostiquer l’écart entre le dashboard accessible en vérification et la 404 encore observée par l’utilisateur sur mobile, puis renvoyer un accès fiable. Clôturé car la 404 n’a pas été reproduite à nouveau, y compris sur plusieurs variantes d’URL testées avec un user-agent mobile.
+- [x] Aider l’utilisateur à retrouver ou réinitialiser le mot de passe d’accès du dashboard Mister B.
+- [x] Changer le mot de passe du dashboard Mister B pour la valeur fournie par l’utilisateur puis valider l’accès avec un test ciblé.
+- [x] Diagnostiquer et corriger le refus d’accès au dashboard Mister B après mise à jour du mot de passe, puis revalider la procédure de connexion réelle côté utilisateur. Clôturé car l’utilisateur a finalement décidé de conserver l’ancien mot de passe actif.
+- [x] Dézoomer légèrement toute la landing page Mister B pour que l’ensemble paraisse plus petit, en réduisant harmonieusement les tailles, espacements et proportions sans changer la structure.
+- [x] Dézoomer encore légèrement toute la landing page Mister B, un cran supplémentaire, en gardant exactement la même composition générale.
+- [x] Conserver le mot de passe historique du dashboard Mister B et abandonner la tentative de changement vers 152647, conformément à la décision finale de l’utilisateur.
+- [x] Revalider en navigateur la connexion réelle au dashboard Mister B avec le mot de passe historique conservé, puis confirmer explicitement l’accès réussi.
+- [x] Finaliser proprement la mise à jour du backlog après abandon du changement vers 152647 et supprimer toute ambiguïté sur le mot de passe actif.
+- [x] Relever le code couleur demandé pour le fond de la landing et enregistrer l’ancienne couleur de fond afin de pouvoir la remettre rapidement si l’utilisateur le redemande.
+- [x] Appliquer la nouvelle couleur de fond `#1BD51C` sur la landing Mister B, tout en conservant l’ancienne valeur `#d9ffd2` pour pouvoir la restaurer rapidement si nécessaire.
+- [x] Vérifier que le pixel Meta et le système complet de suivi de la landing Mister B fonctionnent correctement, tester les événements réels et diagnostiquer toute erreur éventuelle côté page, réseau ou remontée serveur.
+- [x] Remplacer le CTA principal de groupe WhatsApp par le nouveau lien Telegram `https://t.me/+sdIa7KNoIbNjMTg0`, mettre à jour le libellé visible et aligner le tracking du clic avec ce changement sans casser la landing.
+- [x] Renforcer le système de suivi au clic sur les boutons principaux de la landing Mister B pour remonter des interactions plus complètes et plus fiables sans casser la landing ni le dashboard.
+- [x] Clarifier et renforcer le tracking Meta pour que l’événement d’abonnement ne soit envoyé qu’au clic réel sur le bouton de groupe Telegram, et non à la simple visite de page.
+- [x] Ajuster le bouton du groupe Telegram pour que le client arrive aussi directement que possible dans le groupe, sans étape intermédiaire inutile, tout en conservant le tracking au clic.
+- [x] Réduire encore davantage la friction du bouton Groupe Telegram pour viser une ouverture la plus directe possible dans Telegram, avec le meilleur fallback possible sans casser le tracking au clic.
+- [x] Remplacer dans le dashboard les libellés et intitulés affichant encore « clic WhatsApp » par « clic Telegram » là où ils correspondent désormais au CTA principal Telegram, sans casser les métriques existantes.
+- [x] Remplacer l’ancien système de suivi Mister B par le nouveau système de tracking Telegram + Meta CAPI fourni par l’utilisateur, en reprenant sa logique complète, en l’adaptant proprement au projet actuel, en demandant les secrets et identifiants manquants, puis en réalisant les tests nécessaires de bout en bout.
+- [x] Corriger le bouton Groupe Telegram pour qu’il utilise explicitement le lien du bot Telegram et qu’il ouvre Telegram aussi directement que possible sans passage inutile par une page intermédiaire, tout en conservant le tracking du nouveau flux.
+- [x] Ajouter un système de relance automatisé sur le bot Telegram Mister B avec des messages distincts envoyés après `/start` aux échéances 15 minutes, 1 heure, 4 heures, 24 heures, 1 semaine, 2 semaines et 1 mois.
+- [x] Ajouter la mention de contact direct @MisterBNMB dans les messages de relance Telegram Mister B sans modifier la logique ni le calendrier des rappels.
+- [x] Préparer des propositions de messages de relance Telegram Mister B plus longs, plus attirants et plus vendeurs, sans changer la logique ni le calendrier des rappels tant qu’aucune version n’est validée.
+- [x] Proposer puis, après validation, appliquer un message envoyé juste après `/start` avec le lien du canal et @MisterBNMB, et harmoniser cette présence dans tous les messages Telegram du bot.
+- [x] Appliquer une version plus vendeuse au message Telegram envoyé juste après `/start` ainsi qu’aux 7 messages de relance, en conservant le lien du canal et @MisterBNMB dans chaque message, sans modifier la logique ni le calendrier d’envoi existants.
+- [x] Add a dashboard control to edit the Telegram group link used by bot messages, with a Save latest changes button, applying instantly without changing landing page tracking or other existing systems.
+- [x] Replace the current Meta Pixel configuration with the user's new credentials, keeping the landing behavior unchanged, updating the Conversions API token securely, and switching to the user's new Pixel ID once it is provided.
+- [x] Convert Meta tracking to server-side only for PageView and Subscriber events, remove browser-side Pixel tracking, and count a subscriber only when the user actually starts the Telegram bot.
+- [x] Add a dashboard card showing server-side Meta event status for the current landing and bot conversion flow.
+- [x] Add a dedicated dashboard subscriber log showing which Telegram bot starts were counted as server-side conversions.
+- [x] Retrieve and report the bot click and link click counts for the user's current landing analytics question.
+- [x] Add a simple dedicated admin dashboard field to edit only the Telegram bot group/channel link used across bot messages, without changing other bot text or logic.
+- [x] Add an automatic Telegram cumulative admin report every 2 hours showing only landing visits, bot /start count, and channel joins since midnight Europe/Paris, resetting to zero each new Paris day.
+- [x] Add a restricted /rapport bot command for @bestmanylitics and @coucoulala123 that returns the same cumulative day report immediately.
+- [x] Send an immediate Telegram test report equivalent to the 19h cumulative report only to the two authorized recipients.
+- [x] Add targeted Vitest coverage, verify TypeScript remains clean, run the relevant tests, and save a final checkpoint for the Telegram-only admin report work.
+- [x] Fix the Telegram Group CTA so clicking it opens the Telegram bot with the correct auto-start parameter and restores subscriber counting.
+- [x] Fix the Telegram Group button so it always opens the exact Telegram bot URL with the generated `?start=` payload, matching links like `https://t.me/Misternb_bot?start=...`, without changing anything else.
+- [x] Investigate why the Telegram Group CTA still does not auto-send `/start`, verify whether this is a Telegram platform limitation, and implement the closest valid behavior without unrelated changes.
+- [x] Rework the Telegram Group CTA to open the Telegram app as directly as possible with the correct start payload and payload-preserving fallback, while changing nothing else.
+- [x] Analyze the uploaded screen recording to identify the exact Telegram button failure and confirm the root cause before making any further code changes.
+- [x] Diagnose why the current landing still appears unchanged to the user after the Telegram button fixes, and verify whether the live site is serving the latest CTA behavior.
+- [x] Diagnose why the Telegram Group button still shows the same blocking behavior on the user's device after the latest live update, and identify the remaining root cause before making another fix.
+- [x] Prevent the Telegram Group button from opening the plain bot link before the session-specific `?start=` URL is ready, while changing nothing else.
+- [x] Remove stored Telegram bot/test data for @imran0150 and @sumo12069 so they can test as fresh users
+- [x] Re-verify the Telegram Group CTA first-time /start testing instructions after the data reset
+- [x] Review the newly uploaded screen recording to capture the exact remaining Telegram Group CTA failure on the user's device
+- [x] Compare the recorded Telegram button behavior with the current published and latest checkpoint flows to identify the next required fix
+- [x] Re-review the uploaded video specifically for the first-time Telegram bot `/start` failure path
+- [x] Confirm whether the video shows a Telegram platform-side first-time start limitation or a remaining Mister B CTA issue
+- [x] Investigate why pressing START inside Telegram still does not trigger the bot /start flow for the user's test case
+- [x] Verify from runtime evidence whether the failed START attempt reaches the Telegram webhook and database
+- [x] Change the Telegram Group open flow to use the exact payload-bearing bot URL as the primary navigation path so manual START keeps the `/start <payload>` attribution
+- [x] Update the focused Telegram CTA regression tests to reflect the payload-preserving navigation path and rerun them
+- [x] Investigate why the Telegram bot START button is not responding consistently after redirect on mobile and only works on laptop after a refresh
+- [x] Determine whether the remaining issue is caused by stale published code, Telegram client state, or a redirect/timing problem in the Mister B CTA flow
+- [x] Investigate why the last several hours of ad spend did not produce visible new pixel subscribers or bot starts
+- [x] Analyze the recent bot-start, tracking, and attribution records to identify whether the gap is due to traffic volume, Telegram conversion drop-off, or payload attribution loss
+- [x] Verify that every real Telegram bot `/start` sends the Meta subscribe server event needed for ad optimization
+- [x] Confirm whether the current Meta server-event pipeline is already firing on `/start` and identify what still prevents strong attribution in Ads Manager
+- [x] Fix the Telegram click-to-start flow so `/start` preserves the payload, session token, and fbclid as reliably as possible from ad click to bot start
+- [x] Update and rerun focused regression tests for payload-preserving bot start attribution and Meta subscribe event quality
+- [x] Add a live diagnostic view showing recent bot starts with username, time, Meta sent/not sent, sessionToken present/missing, and fbclid present/missing
+- [x] Add focused tests for the bot-start diagnostic view and verify it in the dashboard
+- [x] Compter le nombre de personnes ayant cliqué sur le lien du bot depuis minuit, heure française, et confirmer le chiffre exact
+- [x] Faire en sorte que le clic sur « rejoindre le groupe » ouvre directement le bot Telegram, sans modifier les autres comportements
+- [x] Diagnostiquer pourquoi le clic sur « rejoindre le groupe » n’ouvre toujours pas Telegram directement sur l’appareil de l’utilisateur, puis corriger uniquement ce point
+- [x] Diagnostiquer pourquoi le tracking Meta n’apparaît pas en live sur la publicité/landing et corriger uniquement le point défaillant sans toucher au reste
+- [x] Recontrôler pourquoi le pixel Meta est encore signalé comme non fonctionnel sur le domaine publié et corriger uniquement la cause persistante réelle. Le HTML publié charge désormais bien le bootstrap Pixel attendu sur `mister-b.club`, et un appel direct `/events` avec des `user_data` conformes est accepté par Meta (`events_received: 1`).
+- [x] Rédiger un PDF de synthèse des modifications Meta récemment effectuées sur Mister B pour revue utilisateur
+- [x] Joindre le code correspondant via le checkpoint de projet à analyser
+- [x] Fournir le code source du projet dans un format directement accessible à l'utilisateur en complément du PDF
+- [x] Set FB_PIXEL_ID explicitly in project secrets to 945883278158292 instead of relying on a hardcoded fallback. Obsolete after server-side env unification on `META_PIXEL_ID` and validated production runtime.
+- [x] Apply the confirmed FB_PIXEL_ID directly from chat because the user cannot approve the secrets card manually, then validate the configuration in tests. Obsolete after server-side env unification on `META_PIXEL_ID` and validated production runtime.
+- [x] Apply FB_PIXEL_ID 945883278158292 directly from the collaborator-authorized request and prove it is available in the project runtime. Obsolete after server-side env unification on `META_PIXEL_ID` and validated production runtime.
+- [x] Verify that the already-known production Pixel ID is the exact one loaded on mister-b.club and trace why live browser events still do not appear in Meta
+- [x] Request a Meta Conversions API token that has permission on Pixel ID 945883278158292 and revalidate server-side delivery against that exact pixel. Closed after the new user-provided token stopped returning Missing Permission on the direct `/events` endpoint check.
+- [x] Treat the current Pixel ID and token as the intended production credentials and isolate why Meta still does not show live events for mister-b.club
+- [x] Lire `Pasted_content_32.txt`, extraire toutes les corrections demandées par l’utilisateur, puis les appliquer proprement sur le site
+- [x] Corriger `client/index.html` pour générer `_fbp` avant le chargement du pixel, créer un `PageView eventID` partagé browser/serveur et le persister dans `sessionStorage`
+- [x] Corriger `client/src/lib/tracking.ts` pour persister `_fbc` en cookie et lire l'`eventID` de `PageView` depuis `sessionStorage` en priorité
+- [x] Unifier toutes les variables d’environnement Meta côté serveur sur `META_PIXEL_ID` et `META_CONVERSIONS_TOKEN`, puis supprimer les lectures de `FB_PIXEL_ID`, `FB_CONVERSIONS_API_TOKEN` et `META_CAPI_TOKEN`
+- [x] Configurer `META_PIXEL_ID` avec la valeur de production confirmée `945883278158292`, configurer `META_CONVERSIONS_TOKEN` avec le token CAPI fourni, puis valider par test que le code serveur unifié lit bien ces secrets
+- [x] Remplacer `META_CONVERSIONS_TOKEN` par un token Meta ayant réellement l’autorisation d’accéder au pixel `945883278158292`, car le test direct Graph sur ce pixel renvoie encore `(#100) Missing Permission`. Clôturé après revalidation avec le nouveau token fourni, le contrôle direct `/events` ne renvoyant plus cette erreur.
+- [x] Remplacer `META_CONVERSIONS_TOKEN` par le nouveau token fourni par l’utilisateur, puis revalider son accès exact au pixel `945883278158292` et vérifier si l’erreur `(#100) Missing Permission` disparaît
+- [x] Reprendre le diagnostic Meta en considérant le token comme valide et isoler uniquement le défaut restant de notre implémentation côté projet
+- [x] Attendre explicitement l'envoi CAPI `tracking.record -> sendPageView` au lieu d'un fire-and-forget, afin d'éviter la perte silencieuse d'événements Meta en runtime live
+- [x] Retrouver dans le projet Mister B le fichier exact qui gère le bot Telegram et l'envoi de l'événement Subscribe vers Meta, puis le remettre à l'utilisateur en téléchargement
+- [x] Remplacer les appels fire-and-forget du flux Telegram `/start` par des appels explicitement attendus pour l'envoi Meta Subscribe
+- [x] Ajouter la transmission de `fbp` au payload `fireSubscribeEvent` lors du `/start` Telegram
+- [x] Limiter cette intervention aux deux corrections demandées dans `server/telegramWebhook.ts` et remettre uniquement ce fichier corrigé à l'utilisateur
+- [x] Send one Meta test event for PageView and one for Subscribe using test_event_code `TEST60661`, then report the exact responses in English
+- [x] Verify the end-to-end `fbp` capture and reuse flow for Mister B, and complete any missing implementation pieces before reporting back in English
+- [x] Diagnose why Meta Test Events currently show browser activity instead of the expected server-side Subscribe flow, and correct the real cause
+- [x] Isolate a server-only Meta Subscribe test with a fresh unique test code and no browser page-load contamination, then report the exact result in English
+- [x] Send an isolated server-only Meta PageView test event with test_event_code `TEST60661` and report the exact result in English
+- [x] Diagnose why the isolated server-side Subscribe is not visible in Meta Test Events while the isolated server-side PageView is visible, then identify and correct the real cause
+- [x] Add Meta's canonical subscription fields (`value`, `currency`, `predicted_ltv`) to the server-side Subscribe payload so the event is consistently visible in Test Events
+- [x] Send a clean server-side Meta test that submits PageView and Subscribe together in one isolated run, then report the exact event IDs and API response in English
+- [x] Diagnose why the user's own Meta test path is surfacing browser events instead of the expected server events, then explain the exact correct testing method
+- [x] Fix the 'Join Telegram Group' button so it is clickable again in laptop mode, while preserving the current Telegram tracking flow
+- [x] Remove browser-side Meta event delivery from the Mister B landing so user tests surface only server-side PageView and Subscribe events
+- [x] Diagnose why Meta tracking appears missing on the restored rollback version and explain the exact cause before applying any further change
+- [x] Send fresh server-only Meta PageView and Subscribe test events from my side with test code TEST60661 and report the exact response
+- [x] Diagnose why manually sent Meta test events were accepted but still did not appear in the user's Test Events panel, then identify whether the issue is a wrong dataset/view or a Meta UI visibility problem
+- [x] Re-investigate why Meta accepted the manual server test events but the user still could not see them, without assuming a panel-filter issue
+- [x] Restore a minimal server-only `meta_test_code` passthrough so live Mister B test visits can surface PageView and Telegram Subscribe events in Meta Test Events without re-enabling browser-side Meta tracking
+- [x] Remove the temporary Meta Test Events passthrough and keep Mister B in live pixel/ad tracking mode only
+- [x] Add an admin-only debug page showing the last 5 server-side Meta PageView and Subscribe events with their latest timestamps and status details
+- [x] Add Microsoft Clarity to the Mister B site in a configurable way and verify that the tracking script loads correctly
+- [x] Add Microsoft Clarity using a direct code-based integration path because project secret management is not available for this collaborator workflow
+- [x] Add Microsoft Clarity custom events for Telegram group and contact CTA clicks without changing the existing Meta and server-side tracking flows
+- [x] Investigate why the dashboard shows Telegram group clicks as 0 while Telegram contact clicks are recorded, then fix the tracking or query path if it is broken
+- [x] Rework the private dashboard into a clearer Telegram funnel with separate metrics for CTA clicks, bot starts, and member additions, and fix the current mismatch where group clicks appear as zero
+- [x] Investigate why Telegram bot starts and channel joins still remain at zero despite bot clicks, then fix the broken measurement path if needed
+- [x] Add clearer dashboard visibility for who started the bot and who joined the channel, not only aggregate counts
+- [x] Diagnostiquer pourquoi le tracking Meta CAPI des visites live publicitaires ne remonte pas après la diffusion des ads en production.
+- [x] Vérifier les logs serveur, la configuration déployée et les envois récents Meta CAPI pour identifier la cause réelle de non-remontée.
+- [x] Corriger le flux live Meta si nécessaire, ajouter la régression ciblée correspondante et revalider en conditions réelles.
+- [x] Compare the Mister B tracking implementation against the user's working reference flow for browser-captured `fbp`, server-built `fbc`, DB persistence, and Telegram-triggered Meta Subscribe delivery.
+- [x] Align Mister B so `_fbp` is captured in the browser, stored in `utm_sessions`, and later reused server-side in Meta CAPI without browser pixel delivery.
+- [x] Ensure `fbc` is built server-side from `fbclid` and the original session timestamp, then sent together with `fbp`, hashed `external_id`, IP, and user agent in the Telegram Subscribe CAPI payload.
+- [x] Add focused regression tests proving the replicated Meta server-side tracking model works exactly as specified.
+- [x] Add a live tracking debug page that shows the current landing session, captured `_fbp`, `fbclid`, UTM parameters, session token, and latest PageView event identifier for fast troubleshooting.
+- [x] Expose the latest Telegram funnel diagnostics on the debug page, including bot start status, join status, Meta Subscribe status, and timestamps tied to the stored session.
+- [x] Add a protected server-side debug data endpoint or procedure for the live tracking page and cover the new diagnostics with focused Vitest regression tests.
+- [x] Diagnose why recent rows in the live Telegram join debug panel can show `Session: —` and `FBCLID: —`, and determine whether the attribution is actually missing or only missing from the debug display.
+- [x] Audit how many tracking events fired from yesterday until now and summarize which data each event type contains, using the live Mister B project data.
+- [x] Audit the tracking setup end-to-end and verify exact counts for registered/joined users, bot-started users, website-referred users, pixel/event delivery quality, attribution integrity, and any missing, duplicate, or failed events.
+- [x] Perform a fix-mode root-cause analysis for every verified tracking failure, attribution gap, Meta event issue, and funnel inconsistency in Mister B.
+- [x] Trace exactly where sessionToken, UTM, fbclid, Meta delivery status, and join/start linkage are lost or not persisted across the current codebase.
+- [x] Produce a production-grade implementation plan covering attribution, Meta CAPI reliability, observability, funnel integrity, dashboard accuracy, schema changes, deployment, and testing.
+- [x] Verify post-fix attribution flow end-to-end against the fix-mode checklist, including session preservation from landing to click to /start to join.
+- [x] Verify post-fix Telegram flow behavior, including bypass joins, join-to-start linkage, and whether any in-memory attribution bridge still remains active.
+- [x] Verify post-fix Meta tracking observability and delivery, including PageView auditability, join/subscribe outcomes, failure reasons, and retry behavior.
+- [x] Verify post-fix schema, database tables, and dashboard truthfulness, then produce live counts and classify each checklist item as fixed, partial, broken, or regressed.
+- [x] Use the attached `pasted_content.txt` as the operative prompt and align the next task exactly to its instructions before continuing.
+- [x] Add a durable `funnelToken` identity that is created on first landing, persisted in browser storage and cookie, and carried through pageview, session, Telegram click, `/start`, and join.
+- [x] Replace the in-memory `pendingJoinSessions` bridge with a durable database-backed linkage model that survives restarts, deploys, and multi-instance execution.
+- [x] Make `/start` attribution persistence non-destructive so repeat starts never overwrite existing non-null `sessionToken`, `funnelToken`, UTM fields, `fbclid`, or `fbp`.
+- [x] Add a durable `meta_event_logs` table and persist request, response, status, error, timing, and identity fields for every PageView and Telegram Meta event attempt.
+- [x] Persist PageView Meta outcomes per attempt instead of sending silently.
+- [x] Classify Meta failures as retryable or permanent and implement retry handling for failed retryable events.
+- [x] Add durable funnel classifications for attributed, unattributed, bypass, and legacy states across starts and joins.
+- [x] Upgrade dashboard and Meta debug views so they expose trustworthy visits, clicks, starts, joins, attributed joins, unattributed joins, bypass joins, starts without join, joins without start, Meta success rate, Meta failure rate, retry queue, and source/campaign performance.
+- [x] Apply safe schema migrations and backfill unverifiable historical rows as `legacy_unattributed` without faking attribution.
+- [x] Run targeted tests and live validation for ad click, organic, Telegram click, `/start`, join, repeat `/start`, delayed join, restart between start and join, Meta temporary failure, and duplicate webhook delivery.
+- [x] Préparer un `.env.example` sûr pour édition locale dans Claude Code CLI, en séparant clairement les variables Manus à remplacer, les variables optionnelles et les valeurs de placeholder.
+- [x] Fournir à l'utilisateur un guide court pour ouvrir, configurer et lancer le projet Mister B dans Claude Code CLI hors de l'environnement Manus.
+- [x] Diagnostiquer pourquoi le code téléchargé par l'utilisateur ressemble au template de base au lieu du projet Mister B actuel, puis expliquer la bonne méthode pour récupérer l'archive complète du bon état du projet.
+- [x] Exporter le dossier `client/` actuel du projet Mister B dans une archive ZIP et le remettre à l'utilisateur.
+- [ ] Exporter l'intégralité du projet Mister B actuel dans une archive ZIP unique et la remettre à l'utilisateur.

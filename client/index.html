@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <title>Mister B</title>
+    <meta
+      name="description"
+      content="Des produits haut de gamme sélectionnés avec soin, livrés en 48 à 72 heures. Rejoins notre canal WhatsApp pour découvrir toute la collection."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      var _pvEventId = "pv_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+      window.__misterbPageViewEventId = _pvEventId;
+
+      try {
+        sessionStorage.setItem("misterb_pv_event_id", _pvEventId);
+      } catch (e) {}
+
+      // Manually create the canonical Meta browser cookie (_fbp) before any
+      // React code runs, so the very first server PageView captures it.
+      // Format: fb.<subdomainIndex=1>.<timestamp>.<random>
+      try {
+        if (!/(?:^|; )_fbp=/.test(document.cookie)) {
+          var _fbpRand = Math.floor(Math.random() * 1e16).toString();
+          var _fbpValue = "fb.1." + Date.now() + "." + _fbpRand;
+          var _fbpMaxAge = 60 * 60 * 24 * 90; // 90 days, matches Meta lifetime
+          document.cookie = "_fbp=" + _fbpValue + "; Path=/; Max-Age=" + _fbpMaxAge + "; SameSite=Lax";
+        }
+      } catch (e) {}
+    </script>
+    <script type="text/javascript">
+      (function (c, l, a, r, i, t, y) {
+        c[a] =
+          c[a] ||
+          function () {
+            (c[a].q = c[a].q || []).push(arguments);
+          };
+        t = l.createElement(r);
+        t.async = 1;
+        t.src = "https://www.clarity.ms/tag/" + i;
+        y = l.getElementsByTagName(r)[0];
+        y.parentNode.insertBefore(t, y);
+      })(window, document, "clarity", "script", "wgvif26xqx");
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script
+      defer
+      src="%VITE_ANALYTICS_ENDPOINT%/umami"
+      data-website-id="%VITE_ANALYTICS_WEBSITE_ID%"
+    ></script>
+  </body>
+</html>

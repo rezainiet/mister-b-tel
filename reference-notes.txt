@@ -1,0 +1,9 @@
+Constats de la capture de référence pour la correction mobile compacte :
+- Fond vert pastel uniforme avec léger halo diffus plus clair au centre.
+- Logo circulaire centré en haut, dimension importante mais pas dominante au point de pousser le reste hors écran.
+- Libellé "Master B" court placé juste sous le logo, avec un fort poids typographique.
+- Titre principal en deux lignes compactes, avec drapeau français intégré à la fin.
+- Ligne d’instruction simple et centrée, avec icône de validation verte bien visible.
+- Deux CTA très larges, blancs, arrondis, ombrés, avec icône à gauche et texte noir centré visuellement.
+- Toute la composition reste dans un seul écran téléphone grâce à des marges verticales réduites et à une largeur de bloc bien maîtrisée.
+- Le rendu doit rester plus dense et plus court que la version précédente.
