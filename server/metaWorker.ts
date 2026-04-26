@@ -11,17 +11,24 @@ import { retryStoredMetaRequest } from "./metaCapi";
 const WORKER_NAME = "meta_retry";
 
 const WORKER_INTERVAL_MS = 30_000;
-const MAX_ATTEMPTS = 5;
+// 15 attempts with exponential backoff (cap 6h) gives ~3 days of retry
+// coverage — enough to ride out any realistic Meta outage without losing
+// events. Below ~5 attempts the curve grows quickly (5m → 80m), then flatlines
+// at the 6h cap so the remaining 11 attempts add ~66h of buffer.
+const MAX_ATTEMPTS = 15;
 const BASE_BACKOFF_MS = 5 * 60 * 1000;
+const MAX_BACKOFF_MS = 6 * 60 * 60 * 1000;
 
 let workerStarted = false;
 let workerInterval: NodeJS.Timeout | null = null;
 let workerRunning = false;
 
 function backoffMs(nextAttempt: number) {
-  // 5m, 10m, 20m, 40m, 80m... with full jitter to avoid thundering herd.
+  // 5m, 10m, 20m, 40m, 80m, then capped at 6h. Full jitter on the lower
+  // half of the window to avoid thundering herd when many events come due
+  // at once.
   const exponential = BASE_BACKOFF_MS * Math.pow(2, Math.max(0, nextAttempt - 1));
-  const capped = Math.min(exponential, 6 * 60 * 60 * 1000); // cap at 6h
+  const capped = Math.min(exponential, MAX_BACKOFF_MS);
   return Math.floor(Math.random() * capped) + Math.floor(capped / 2);
 }
 

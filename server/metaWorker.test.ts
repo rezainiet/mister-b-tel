@@ -105,7 +105,7 @@ describe("metaWorker.processOneMetaRetryBatch", () => {
         id: 3,
         eventScope: "telegram_join",
         eventId: "tg_join_99",
-        attemptCount: 4, // next attempt = 5 = cap
+        attemptCount: 14, // next attempt = 15 = MAX_ATTEMPTS cap
         telegramUserId: "99",
         requestPayloadJson: JSON.stringify({ data: [{}] }),
       } as any,

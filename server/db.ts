@@ -876,7 +876,7 @@ export async function getRetryableMetaEvents(limit = 25) {
       and(
         eq(metaEventLogs.retryable, 1),
         or(eq(metaEventLogs.status, "failed"), eq(metaEventLogs.status, "retrying")),
-        lte(metaEventLogs.attemptCount, 5),
+        lte(metaEventLogs.attemptCount, 15),
         or(isNull(metaEventLogs.nextRetryAt), lte(metaEventLogs.nextRetryAt, now)),
       ),
     )
@@ -1043,12 +1043,16 @@ export async function getJoinStats() {
     };
   }
 
+  // Bypass joins (organic Telegram members who joined without going through
+  // the funnel) are counted separately and excluded from conversion-rate
+  // math — they're noise for ad/funnel performance metrics.
   const [rows]: any = await db.execute(sql`
     SELECT
       COUNT(*) AS totalJoins,
+      COALESCE(SUM(CASE WHEN tj.attributionStatus <> 'bypass_join' THEN 1 ELSE 0 END), 0) AS funnelJoins,
       COALESCE(SUM(CASE WHEN DATE(tj.joinedAt) = CURRENT_DATE() THEN 1 ELSE 0 END), 0) AS todayJoins,
-      COALESCE(SUM(CASE WHEN COALESCE(mel.status, tj.metaEventSent) = 'sent' THEN 1 ELSE 0 END), 0) AS totalMetaCount,
-      COALESCE(SUM(CASE WHEN COALESCE(mel.status, tj.metaEventSent) = 'sent' AND DATE(tj.joinedAt) = CURRENT_DATE() THEN 1 ELSE 0 END), 0) AS todayMetaJoins,
+      COALESCE(SUM(CASE WHEN COALESCE(mel.status, tj.metaEventSent) = 'sent' AND tj.attributionStatus <> 'bypass_join' THEN 1 ELSE 0 END), 0) AS totalMetaCount,
+      COALESCE(SUM(CASE WHEN COALESCE(mel.status, tj.metaEventSent) = 'sent' AND DATE(tj.joinedAt) = CURRENT_DATE() AND tj.attributionStatus <> 'bypass_join' THEN 1 ELSE 0 END), 0) AS todayMetaJoins,
       COALESCE(SUM(CASE WHEN tj.attributionStatus = 'attributed_join' THEN 1 ELSE 0 END), 0) AS attributedJoins,
       COALESCE(SUM(CASE WHEN tj.attributionStatus IN ('unattributed_join', 'legacy_unattributed') THEN 1 ELSE 0 END), 0) AS unattributedJoins,
       COALESCE(SUM(CASE WHEN tj.attributionStatus = 'bypass_join' THEN 1 ELSE 0 END), 0) AS bypassJoins
@@ -1057,23 +1061,30 @@ export async function getJoinStats() {
   `);
 
   const totalJoins = Number(rows?.[0]?.totalJoins || 0);
+  const funnelJoins = Number(rows?.[0]?.funnelJoins || 0);
   const totalMetaCount = Number(rows?.[0]?.totalMetaCount || 0);
 
   return {
     totalJoins,
+    funnelJoins,
     todayJoins: Number(rows?.[0]?.todayJoins || 0),
     totalMetaCount,
     todayMetaJoins: Number(rows?.[0]?.todayMetaJoins || 0),
     attributedJoins: Number(rows?.[0]?.attributedJoins || 0),
     unattributedJoins: Number(rows?.[0]?.unattributedJoins || 0),
     bypassJoins: Number(rows?.[0]?.bypassJoins || 0),
-    conversionRate: totalJoins > 0 ? ((totalMetaCount / totalJoins) * 100).toFixed(1) : "0.0",
+    // Conversion rate is computed against funnel joins (excluding bypass)
+    // so external Telegram members who joined directly don't dilute the
+    // funnel performance signal.
+    conversionRate: funnelJoins > 0 ? ((totalMetaCount / funnelJoins) * 100).toFixed(1) : "0.0",
   };
 }
 
 export async function getJoinsByCampaign() {
   const db = await getDb();
   if (!db) return [];
+  // Exclude bypass joins from per-campaign aggregations — they have no UTM
+  // and would all bucket into "Direct / inconnu", drowning real campaigns.
   const [rows]: any = await db.execute(sql`
     SELECT
       COALESCE(NULLIF(tj.utmCampaign, ''), 'Direct / inconnu') AS campaign,
@@ -1082,6 +1093,7 @@ export async function getJoinsByCampaign() {
       COALESCE(SUM(CASE WHEN tj.attributionStatus = 'attributed_join' THEN 1 ELSE 0 END), 0) AS attributedCount
     FROM telegram_joins tj
     LEFT JOIN meta_event_logs mel ON mel.eventId = tj.metaEventId
+    WHERE tj.attributionStatus <> 'bypass_join'
     GROUP BY COALESCE(NULLIF(tj.utmCampaign, ''), 'Direct / inconnu')
     ORDER BY joinsCount DESC
   `);
@@ -1452,8 +1464,8 @@ export async function getDailyReportStats() {
       COALESCE(SUM(CASE WHEN DATE(reminder2SentAt) = CURRENT_DATE() - INTERVAL 1 DAY THEN 1 ELSE 0 END), 0) AS todayReminders2,
       COALESCE(SUM(CASE WHEN DATE(reminder3SentAt) = CURRENT_DATE() - INTERVAL 1 DAY THEN 1 ELSE 0 END), 0) AS todayReminders3,
       COUNT(*) AS botStartsCount,
-      (SELECT COUNT(*) FROM telegram_joins) AS totalJoinsCount,
-      (SELECT COALESCE(SUM(CASE WHEN metaEventSent = 'sent' THEN 1 ELSE 0 END), 0) FROM telegram_joins) AS totalMetaCount
+      (SELECT COUNT(*) FROM telegram_joins WHERE attributionStatus <> 'bypass_join') AS totalJoinsCount,
+      (SELECT COALESCE(SUM(CASE WHEN metaEventSent = 'sent' AND attributionStatus <> 'bypass_join' THEN 1 ELSE 0 END), 0) FROM telegram_joins) AS totalMetaCount
     FROM bot_starts
   `);
 
