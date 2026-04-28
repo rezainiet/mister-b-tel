@@ -1650,12 +1650,23 @@ export async function getBroadcastRecipientIds(): Promise<string[]> {
 export async function hasInflightBroadcast() {
   const db = await getDb();
   if (!db) return false;
-  const rows = await db
-    .select({ id: broadcasts.id })
-    .from(broadcasts)
-    .where(or(eq(broadcasts.status, "pending"), eq(broadcasts.status, "processing")))
-    .limit(1);
-  return rows.length > 0;
+  try {
+    const rows = await db
+      .select({ id: broadcasts.id })
+      .from(broadcasts)
+      .where(or(eq(broadcasts.status, "pending"), eq(broadcasts.status, "processing")))
+      .limit(1);
+    return rows.length > 0;
+  } catch (error) {
+    // Pre-migration: if the `broadcasts` table doesn't exist yet, treat that
+    // as "no inflight broadcast" rather than failing the whole recipients
+    // query. The send mutation still won't work until the migration runs.
+    const message = error instanceof Error ? error.message : String(error);
+    if (/doesn['’]?t exist|no such table/i.test(message)) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 export async function createBroadcastWithJobs(messageText: string, recipientIds: string[]) {
