@@ -85,9 +85,14 @@ function isWebhookSecretValid(supplied: string | string[] | undefined) {
   return timingSafeEqualString(expected, headerValue);
 }
 
-export function buildDefaultWelcomeMessage(groupUrl: string = DEFAULT_TELEGRAM_GROUP_URL) {
+export function buildDefaultWelcomeMessage(
+  groupUrl: string = DEFAULT_TELEGRAM_GROUP_URL,
+  firstName?: string | null,
+) {
+  const trimmedName = (firstName || "").trim();
+  const greeting = trimmedName ? `Bienvenue chez Mister B, ${trimmedName}.` : "Bienvenue chez Mister B.";
   return [
-    "Bienvenue chez Mister B.",
+    greeting,
     "Ici, tu vas pouvoir accéder aux nouveautés, aux infos réservées et au contenu privé.",
     `Rejoins maintenant le canal privé ici → ${groupUrl}`,
     "",
@@ -524,7 +529,7 @@ export function setupTelegramWebhook(app: Express) {
             firstName: telegramMessage.from.first_name || null,
             groupUrl: currentGroupUrl,
           })
-        : buildDefaultWelcomeMessage(currentGroupUrl);
+        : buildDefaultWelcomeMessage(currentGroupUrl, telegramMessage.from.first_name || null);
       await sendTelegramMessage(telegramMessage.from.id, welcomeBody);
     }
 

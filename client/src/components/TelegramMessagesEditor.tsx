@@ -350,6 +350,9 @@ function ReminderCard({
           Save delay
         </button>
       </div>
+      <p className="mt-1 text-[11px] text-slate-500">
+        Applies to the next /start. Already-queued reminders keep their original schedule.
+      </p>
 
       <textarea
         value={messageDraft}
