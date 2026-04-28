@@ -26,11 +26,7 @@ import {
   isTelegramAdminAuthorized,
 } from "./telegramAdminReports";
 import { sendTelegramMessage } from "./telegramBot";
-import {
-  DEFAULT_TELEGRAM_GROUP_URL,
-  getTelegramGroupUrl,
-  replaceTelegramGroupUrlInText,
-} from "./telegramGroupLink";
+import { DEFAULT_TELEGRAM_GROUP_URL, getTelegramGroupUrl } from "./telegramGroupLink";
 import {
   renderTelegramWelcomeMessage,
   scheduleTelegramReminderSequence,
@@ -527,10 +523,10 @@ export function setupTelegramWebhook(app: Express) {
         getTelegramGroupUrl(),
       ]);
       const welcomeBody = welcomeMsg
-        ? renderTelegramWelcomeMessage(
-            replaceTelegramGroupUrlInText(welcomeMsg, currentGroupUrl),
-            { firstName: telegramMessage.from.first_name || null, groupUrl: currentGroupUrl },
-          )
+        ? renderTelegramWelcomeMessage(welcomeMsg, {
+            firstName: telegramMessage.from.first_name || null,
+            groupUrl: currentGroupUrl,
+          })
         : buildDefaultWelcomeMessage(currentGroupUrl);
       await sendTelegramMessage(telegramMessage.from.id, welcomeBody);
     }
