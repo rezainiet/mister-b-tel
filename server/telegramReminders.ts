@@ -3,7 +3,7 @@ import { botStarts, telegramReminderJobs } from "../drizzle/schema";
 import { tryAcquireLease } from "./_core/leaderLease";
 import { log } from "./_core/logger";
 import { getDb, getSetting } from "./db";
-import { sendTelegramMessage } from "./telegramBot";
+import { buildUrlInlineKeyboard, sendTelegramMessage } from "./telegramBot";
 import { DEFAULT_TELEGRAM_GROUP_URL, getTelegramGroupUrl } from "./telegramGroupLink";
 
 const WORKER_NAME = "telegram_reminders";
@@ -399,7 +399,9 @@ export async function processDueTelegramReminderJobs() {
       continue;
     }
 
-    const result = await sendTelegramMessage(job.chatId, job.messageText);
+    const result = await sendTelegramMessage(job.chatId, job.messageText, {
+      inlineButtons: buildUrlInlineKeyboard(job.messageText),
+    });
 
     if (result.ok) {
       await markJobSent(job.id);

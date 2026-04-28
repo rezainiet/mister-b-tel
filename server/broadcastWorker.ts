@@ -8,7 +8,7 @@ import {
   markBroadcastJobSent,
   refreshBroadcastCounters,
 } from "./db";
-import { sendTelegramMessage } from "./telegramBot";
+import { buildUrlInlineKeyboard, sendTelegramMessage } from "./telegramBot";
 
 // Telegram's published bulk-send safety zone is ~30 messages/sec to distinct
 // users. Going higher risks a bot-wide flood-ban (HTTP 429 + retry_after) that
@@ -38,21 +38,28 @@ async function processOneTick() {
     return;
   }
 
+  // Auto-attach inline keyboard buttons for any URL the admin included in
+  // the broadcast text. Computed once per tick (same text for every send).
+  const inlineButtons = buildUrlInlineKeyboard(broadcast.messageText);
+
   // Send sequentially within the tick so we never burst above MESSAGES_PER_TICK
   // per second. Telegram rate-limits per-bot, not per-recipient, so parallelism
   // doesn't help and only risks hitting the burst ceiling.
   for (const job of jobs) {
-    const result = await sendTelegramMessage(job.chatId, broadcast.messageText);
+    const result = await sendTelegramMessage(job.chatId, broadcast.messageText, { inlineButtons });
 
     if (result.ok) {
       await markBroadcastJobSent(job.id);
     } else if (result.blocked) {
       await markBroadcastJobBlocked(job.id, job.telegramUserId, result.description || "blocked");
-    } else if (result.status === 429) {
-      // Flood-banned: stop this tick early. The next tick (1s later) will
-      // resume; remaining jobs stay 'pending' and get retried automatically.
-      log.warn("broadcastWorker", "rate_limited", {
+    } else if (result.status === 429 || result.transient) {
+      // Flood-ban (429) or transient network issue (timeout/abort). End the
+      // tick early; the job stays 'pending' and the next tick retries it
+      // — preferable to permanently marking it 'failed' for what's likely a
+      // recoverable condition.
+      log.warn("broadcastWorker", result.status === 429 ? "rate_limited" : "transient_error", {
         broadcastId: broadcast.id,
+        status: result.status,
         description: result.description,
       });
       break;

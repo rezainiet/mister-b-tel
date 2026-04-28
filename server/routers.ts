@@ -763,27 +763,28 @@ export const appRouter = router({
         if (!trimmed) {
           return { success: false, error: "Message must not be empty." } as const;
         }
-        // Single-flight guard: refuse to enqueue a new broadcast if any other
-        // broadcast is still pending or processing. The dashboard polls status
-        // and re-enables the button after completion.
-        if (await hasInflightBroadcast()) {
+        const recipientIds = await getBroadcastRecipientIds();
+        if (recipientIds.length === 0) {
+          return { success: false, error: "No bot subscribers to broadcast to." } as const;
+        }
+        // Atomic single-flight: createBroadcastWithJobs takes a row lock on
+        // any existing pending/processing broadcast inside its transaction
+        // and refuses to insert a duplicate. This closes the race where two
+        // simultaneous clicks both saw inflight=false and double-sent.
+        const result = await createBroadcastWithJobs(trimmed, recipientIds);
+        if (!result.ok) {
           return {
             success: false,
             error: "A broadcast is already running. Wait for it to finish before sending another.",
           } as const;
         }
-        const recipientIds = await getBroadcastRecipientIds();
-        if (recipientIds.length === 0) {
-          return { success: false, error: "No bot subscribers to broadcast to." } as const;
-        }
-        const { broadcastId } = await createBroadcastWithJobs(trimmed, recipientIds);
         log.info("dashboard.broadcastSend", "queued", {
-          broadcastId,
+          broadcastId: result.broadcastId,
           totalRecipients: recipientIds.length,
         });
         return {
           success: true as const,
-          broadcastId,
+          broadcastId: result.broadcastId,
           totalRecipients: recipientIds.length,
         };
       }),

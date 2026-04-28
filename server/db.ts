@@ -1624,27 +1624,51 @@ export async function getTelegramRecipientsByUsernames(usernames: string[]) {
 // at a Telegram-safe rate to avoid flood-bans on the bot account.
 // ──────────────────────────────────────────────────────────────────────────
 
+// Mirror of the catch in hasInflightBroadcast: tolerate a missing
+// bot_starts table or missing botBlocked column so the dashboard stays
+// responsive on a half-migrated DB rather than silently rendering "0".
+function isSchemaNotReadyError(error: unknown) {
+  const e = error as { code?: string; errno?: number; message?: string };
+  return (
+    e?.code === "ER_NO_SUCH_TABLE" ||
+    e?.code === "ER_BAD_FIELD_ERROR" ||
+    e?.errno === 1146 ||
+    e?.errno === 1054 ||
+    /doesn['’]?t exist|no such table|unknown column/i.test(e?.message || String(error))
+  );
+}
+
 export async function getBroadcastRecipientCount() {
   const db = await getDb();
   if (!db) return 0;
-  const [rows]: any = await db.execute(sql`
-    SELECT COUNT(*) AS recipientCount
-    FROM bot_starts
-    WHERE botBlocked = 0
-  `);
-  return Number(rows?.[0]?.recipientCount || 0);
+  try {
+    const [rows]: any = await db.execute(sql`
+      SELECT COUNT(*) AS recipientCount
+      FROM bot_starts
+      WHERE botBlocked = 0
+    `);
+    return Number(rows?.[0]?.recipientCount || 0);
+  } catch (error) {
+    if (isSchemaNotReadyError(error)) return 0;
+    throw error;
+  }
 }
 
 export async function getBroadcastRecipientIds(): Promise<string[]> {
   const db = await getDb();
   if (!db) return [];
-  const [rows]: any = await db.execute(sql`
-    SELECT telegramUserId
-    FROM bot_starts
-    WHERE botBlocked = 0
-    ORDER BY id ASC
-  `);
-  return (rows as Array<{ telegramUserId: string }>).map((r) => r.telegramUserId);
+  try {
+    const [rows]: any = await db.execute(sql`
+      SELECT telegramUserId
+      FROM bot_starts
+      WHERE botBlocked = 0
+      ORDER BY id ASC
+    `);
+    return (rows as Array<{ telegramUserId: string }>).map((r) => r.telegramUserId);
+  } catch (error) {
+    if (isSchemaNotReadyError(error)) return [];
+    throw error;
+  }
 }
 
 export async function hasInflightBroadcast() {
@@ -1674,13 +1698,41 @@ export async function hasInflightBroadcast() {
   }
 }
 
-export async function createBroadcastWithJobs(messageText: string, recipientIds: string[]) {
+export type CreateBroadcastResult =
+  | { ok: true; broadcastId: number }
+  | { ok: false; reason: "inflight_exists" };
+
+export async function createBroadcastWithJobs(
+  messageText: string,
+  recipientIds: string[],
+): Promise<CreateBroadcastResult> {
   const db = await getDb();
   if (!db) {
     throw new Error("Database not available");
   }
 
   return db.transaction(async (tx) => {
+    // Single-flight guard inside the transaction. SELECT … FOR UPDATE locks
+    // matching rows so a concurrent insert in another connection blocks until
+    // we commit/rollback. Combined with re-checking after the lock, this
+    // closes the TOCTOU gap that previously let two near-simultaneous admin
+    // clicks both create a broadcast → every subscriber received the message
+    // twice.
+    const inflightRows: any = await tx.execute(sql`
+      SELECT id FROM ${broadcasts}
+      WHERE ${broadcasts.status} IN ('pending', 'processing')
+      LIMIT 1
+      FOR UPDATE
+    `);
+    const inflightArray = Array.isArray(inflightRows?.[0])
+      ? inflightRows[0]
+      : Array.isArray(inflightRows)
+      ? inflightRows
+      : [];
+    if (inflightArray.length > 0) {
+      return { ok: false, reason: "inflight_exists" } as const;
+    }
+
     const [insertResult]: any = await tx.insert(broadcasts).values({
       messageText,
       totalRecipients: recipientIds.length,
@@ -1706,7 +1758,7 @@ export async function createBroadcastWithJobs(messageText: string, recipientIds:
       }
     }
 
-    return { broadcastId };
+    return { ok: true, broadcastId } as const;
   });
 }
 
@@ -1730,25 +1782,32 @@ export async function getRecentBroadcasts(limit = 10) {
 export async function claimNextBroadcast() {
   const db = await getDb();
   if (!db) return null;
-  const [pending] = await db
+  // Match BOTH 'pending' (first tick of a new broadcast) and 'processing'
+  // (continuing a broadcast we already started). The worker is single-leader
+  // (leaderLease) so we don't need cross-instance contention protection here;
+  // the pending→processing UPDATE below is a no-op when already processing.
+  const [next] = await db
     .select()
     .from(broadcasts)
-    .where(eq(broadcasts.status, "pending"))
+    .where(or(eq(broadcasts.status, "pending"), eq(broadcasts.status, "processing")))
     .orderBy(broadcasts.createdAt)
     .limit(1);
-  if (!pending) return null;
-  // Atomic transition pending → processing. If another worker claimed it
-  // first, `affectedRows` will be 0 and we skip.
+  if (!next) return null;
+  if (next.status === "processing") {
+    return next;
+  }
+  // First-tick claim: atomically promote pending → processing. If another
+  // process beat us to it, `affectedRows` is 0 and we skip.
   const result: any = await db.execute(sql`
     UPDATE ${broadcasts}
     SET ${broadcasts.status} = 'processing',
         ${broadcasts.startedAt} = COALESCE(${broadcasts.startedAt}, NOW())
-    WHERE ${broadcasts.id} = ${pending.id}
+    WHERE ${broadcasts.id} = ${next.id}
       AND ${broadcasts.status} = 'pending'
   `);
   const affected = Number(result?.[0]?.affectedRows ?? result?.affectedRows ?? 0);
   if (!affected) return null;
-  return { ...pending, status: "processing" as const };
+  return { ...next, status: "processing" as const };
 }
 
 export async function getDueBroadcastJobs(broadcastId: number, limit: number) {

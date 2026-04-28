@@ -25,7 +25,7 @@ import {
   buildTelegramAdminReportText,
   isTelegramAdminAuthorized,
 } from "./telegramAdminReports";
-import { sendTelegramMessage } from "./telegramBot";
+import { buildUrlInlineKeyboard, sendTelegramMessage } from "./telegramBot";
 import { DEFAULT_TELEGRAM_GROUP_URL, getTelegramGroupUrl } from "./telegramGroupLink";
 import {
   renderTelegramWelcomeMessage,
@@ -530,7 +530,9 @@ export function setupTelegramWebhook(app: Express) {
             groupUrl: currentGroupUrl,
           })
         : buildDefaultWelcomeMessage(currentGroupUrl, telegramMessage.from.first_name || null);
-      await sendTelegramMessage(telegramMessage.from.id, welcomeBody);
+      await sendTelegramMessage(telegramMessage.from.id, welcomeBody, {
+        inlineButtons: buildUrlInlineKeyboard(welcomeBody),
+      });
     }
 
     const memberUpdate = update.chat_member || update.my_chat_member;
