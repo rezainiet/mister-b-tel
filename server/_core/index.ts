@@ -24,29 +24,70 @@ async function runPendingMigrations() {
     log.warn("startup", "skip_migrations_no_database_url");
     return;
   }
-  // Skip when explicitly opted out (e.g., a separate ops process owns
-  // migrations and we don't want each instance racing to apply them, or the
-  // operator has historically applied SQL manually and the
-  // `__drizzle_migrations` ledger isn't in sync — in which case auto-migrate
-  // would try to re-create existing tables and noisy-fail every boot).
   if (process.env.AUTO_MIGRATE?.toLowerCase() === "false") {
     log.info("startup", "skip_migrations_auto_migrate_disabled");
     return;
   }
+
   // Use a dedicated short-lived connection so a transient migration error
   // doesn't poison the long-lived app connection pool.
   const connection = await mysql2.createConnection(url);
   try {
-    const db = mysqlDrizzle(connection);
-    const migrationsFolder = path.resolve(process.cwd(), "drizzle");
-    await mysqlMigrate(db, { migrationsFolder });
-    log.info("startup", "migrations_applied");
+    // Phase 1: Drizzle migration ledger. Best-effort — on production DBs
+    // that pre-date the ledger, the older `CREATE TABLE` migrations will
+    // collide with existing tables; that's logged but non-fatal.
+    try {
+      const db = mysqlDrizzle(connection);
+      const migrationsFolder = path.resolve(process.cwd(), "drizzle");
+      await mysqlMigrate(db, { migrationsFolder });
+      log.info("startup", "migrations_applied");
+    } catch (error) {
+      log.warn("startup", "drizzle_migrate_failed_non_fatal", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Phase 2: idempotent bootstrap of the broadcast tables. Bypasses the
+    // ledger entirely so the broadcast feature works even when the Drizzle
+    // migrate step couldn't sync. CREATE TABLE IF NOT EXISTS is safe to
+    // run on every boot — it's a no-op when the tables already exist.
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS \`broadcasts\` (
+        \`id\` int AUTO_INCREMENT NOT NULL,
+        \`messageText\` text NOT NULL,
+        \`totalRecipients\` int NOT NULL DEFAULT 0,
+        \`sentCount\` int NOT NULL DEFAULT 0,
+        \`blockedCount\` int NOT NULL DEFAULT 0,
+        \`failedCount\` int NOT NULL DEFAULT 0,
+        \`status\` enum('pending','processing','completed','cancelled') NOT NULL DEFAULT 'pending',
+        \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`startedAt\` timestamp NULL,
+        \`completedAt\` timestamp NULL,
+        PRIMARY KEY (\`id\`)
+      )
+    `);
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS \`broadcast_jobs\` (
+        \`id\` int AUTO_INCREMENT NOT NULL,
+        \`broadcastId\` int NOT NULL,
+        \`telegramUserId\` varchar(64) NOT NULL,
+        \`chatId\` varchar(64) NOT NULL,
+        \`status\` enum('pending','processing','sent','blocked','failed') NOT NULL DEFAULT 'pending',
+        \`attempts\` int NOT NULL DEFAULT 0,
+        \`sentAt\` timestamp NULL,
+        \`failedAt\` timestamp NULL,
+        \`errorMessage\` text,
+        \`createdAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        \`updatedAt\` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (\`id\`),
+        KEY \`broadcast_jobs_broadcast_status_idx\` (\`broadcastId\`, \`status\`)
+      )
+    `);
+    log.info("startup", "broadcast_tables_ensured");
   } catch (error) {
-    // Don't crash the server if the migration ledger is out of sync — the
-    // app must still come up so the operator can read logs and intervene.
-    // The broadcast UI degrades gracefully (recipient count works without
-    // the new tables; the send button errors with a clear message).
-    log.error("startup", "migrations_failed_non_fatal", {
+    // Even the idempotent CREATE TABLE statements can fail (permissions,
+    // disk full, etc.) — log loudly but keep the server up.
+    log.error("startup", "broadcast_tables_ensure_failed", {
       error: error instanceof Error ? error.message : String(error),
     });
   } finally {

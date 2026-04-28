@@ -1658,11 +1658,16 @@ export async function hasInflightBroadcast() {
       .limit(1);
     return rows.length > 0;
   } catch (error) {
-    // Pre-migration: if the `broadcasts` table doesn't exist yet, treat that
+    // Pre-bootstrap: if the `broadcasts` table doesn't exist yet, treat that
     // as "no inflight broadcast" rather than failing the whole recipients
-    // query. The send mutation still won't work until the migration runs.
-    const message = error instanceof Error ? error.message : String(error);
-    if (/doesn['’]?t exist|no such table/i.test(message)) {
+    // query. The startup bootstrap creates the tables before the worker runs,
+    // but this catch keeps the dashboard responsive if that ever fails.
+    const e = error as { code?: string; errno?: number; message?: string };
+    if (
+      e?.code === "ER_NO_SUCH_TABLE" ||
+      e?.errno === 1146 ||
+      /doesn['’]?t exist|no such table/i.test(e?.message || String(error))
+    ) {
       return false;
     }
     throw error;
