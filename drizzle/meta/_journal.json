@@ -78,6 +78,13 @@
       "when": 1777224681704,
       "tag": "0010_dizzy_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1777375226661,
+      "tag": "0011_opposite_kulan_gath",
+      "breakpoints": true
     }
   ]
 }

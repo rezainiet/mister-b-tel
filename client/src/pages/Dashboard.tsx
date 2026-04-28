@@ -34,6 +34,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { getFreshnessTone, getStatusHeadline, minutesSince } from "@shared/dashboard";
+import { BroadcastPanel } from "@/components/BroadcastPanel";
 import { TelegramMessagesEditor } from "@/components/TelegramMessagesEditor";
 
 type DashboardPreset = "24h" | "48h" | "7d" | "15d" | "30d";
@@ -1359,6 +1360,8 @@ export default function Dashboard() {
                 </table>
               </div>
             </Card>
+
+            <BroadcastPanel token={token} />
 
             <TelegramMessagesEditor token={token} />
 

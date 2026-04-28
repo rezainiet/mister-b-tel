@@ -42,7 +42,18 @@ import {
 } from "./db";
 import { sendPageView } from "./facebookCapi";
 import { buildServerFbc, retryStoredMetaRequest } from "./metaCapi";
-import { getLatestUtmSessionByFunnelToken, getUtmSessionByToken, getSetting } from "./db";
+import {
+  createBroadcastWithJobs,
+  getBroadcastById,
+  getBroadcastRecipientCount,
+  getBroadcastRecipientIds,
+  getLatestUtmSessionByFunnelToken,
+  getRecentBroadcasts,
+  getUtmSessionByToken,
+  getSetting,
+  hasInflightBroadcast,
+  refreshBroadcastCounters,
+} from "./db";
 import { syncTelegramGroupUrlContent, TELEGRAM_GROUP_URL_SETTING_KEY, validateTelegramGroupUrl } from "./telegramGroupLink";
 import {
   TELEGRAM_REMINDER_DELAY_BOUNDS,
@@ -729,6 +740,98 @@ export const appRouter = router({
       // become visible to the operator (the function used to swallow errors
       // with a single console.error).
       return getRecordEventStats();
+    }),
+    broadcastRecipients: publicProcedure.input(dashboardAuthInput).query(async ({ input }) => {
+      if (!isDashboardTokenValid(input.token)) {
+        return { error: "Unauthorized" } as const;
+      }
+      const recipientCount = await getBroadcastRecipientCount();
+      const inflight = await hasInflightBroadcast();
+      return { recipientCount, inflight } as const;
+    }),
+    broadcastSend: publicProcedure
+      .input(
+        dashboardAuthInput.extend({
+          messageText: z.string().min(1).max(4096),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        if (!isDashboardTokenValid(input.token)) {
+          return { error: "Unauthorized" } as const;
+        }
+        const trimmed = input.messageText.trim();
+        if (!trimmed) {
+          return { success: false, error: "Message must not be empty." } as const;
+        }
+        // Single-flight guard: refuse to enqueue a new broadcast if any other
+        // broadcast is still pending or processing. The dashboard polls status
+        // and re-enables the button after completion.
+        if (await hasInflightBroadcast()) {
+          return {
+            success: false,
+            error: "A broadcast is already running. Wait for it to finish before sending another.",
+          } as const;
+        }
+        const recipientIds = await getBroadcastRecipientIds();
+        if (recipientIds.length === 0) {
+          return { success: false, error: "No bot subscribers to broadcast to." } as const;
+        }
+        const { broadcastId } = await createBroadcastWithJobs(trimmed, recipientIds);
+        log.info("dashboard.broadcastSend", "queued", {
+          broadcastId,
+          totalRecipients: recipientIds.length,
+        });
+        return {
+          success: true as const,
+          broadcastId,
+          totalRecipients: recipientIds.length,
+        };
+      }),
+    broadcastStatus: publicProcedure
+      .input(dashboardAuthInput.extend({ broadcastId: z.number().int().positive() }))
+      .query(async ({ input }) => {
+        if (!isDashboardTokenValid(input.token)) {
+          return { error: "Unauthorized" } as const;
+        }
+        // Refreshing inside the read keeps the dashboard in sync without a
+        // separate worker tick — cheap because the underlying SUM-CASE query
+        // is well-indexed by broadcastId.
+        await refreshBroadcastCounters(input.broadcastId);
+        const broadcast = await getBroadcastById(input.broadcastId);
+        if (!broadcast) {
+          return { error: "Broadcast not found" } as const;
+        }
+        return {
+          id: broadcast.id,
+          messageText: broadcast.messageText,
+          status: broadcast.status,
+          totalRecipients: broadcast.totalRecipients,
+          sentCount: broadcast.sentCount,
+          blockedCount: broadcast.blockedCount,
+          failedCount: broadcast.failedCount,
+          createdAt: broadcast.createdAt,
+          startedAt: broadcast.startedAt,
+          completedAt: broadcast.completedAt,
+        } as const;
+      }),
+    broadcastList: publicProcedure.input(dashboardAuthInput).query(async ({ input }) => {
+      if (!isDashboardTokenValid(input.token)) {
+        return { error: "Unauthorized" } as const;
+      }
+      const rows = await getRecentBroadcasts(10);
+      return {
+        broadcasts: rows.map((row) => ({
+          id: row.id,
+          messageText: row.messageText,
+          status: row.status,
+          totalRecipients: row.totalRecipients,
+          sentCount: row.sentCount,
+          blockedCount: row.blockedCount,
+          failedCount: row.failedCount,
+          createdAt: row.createdAt,
+          completedAt: row.completedAt,
+        })),
+      } as const;
     }),
   }),
 });

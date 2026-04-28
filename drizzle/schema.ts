@@ -260,6 +260,43 @@ export const telegramReminderJobs = mysqlTable("telegram_reminder_jobs", {
 export type TelegramReminderJob = typeof telegramReminderJobs.$inferSelect;
 export type InsertTelegramReminderJob = typeof telegramReminderJobs.$inferInsert;
 
+export const broadcasts = mysqlTable("broadcasts", {
+  id: int("id").autoincrement().primaryKey(),
+  messageText: text("messageText").notNull(),
+  totalRecipients: int("totalRecipients").default(0).notNull(),
+  sentCount: int("sentCount").default(0).notNull(),
+  blockedCount: int("blockedCount").default(0).notNull(),
+  failedCount: int("failedCount").default(0).notNull(),
+  status: mysqlEnum("status", ["pending", "processing", "completed", "cancelled"])
+    .default("pending")
+    .notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  startedAt: timestamp("startedAt"),
+  completedAt: timestamp("completedAt"),
+});
+
+export type Broadcast = typeof broadcasts.$inferSelect;
+export type InsertBroadcast = typeof broadcasts.$inferInsert;
+
+export const broadcastJobs = mysqlTable("broadcast_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  broadcastId: int("broadcastId").notNull(),
+  telegramUserId: varchar("telegramUserId", { length: 64 }).notNull(),
+  chatId: varchar("chatId", { length: 64 }).notNull(),
+  status: mysqlEnum("status", ["pending", "processing", "sent", "blocked", "failed"])
+    .default("pending")
+    .notNull(),
+  attempts: int("attempts").default(0).notNull(),
+  sentAt: timestamp("sentAt"),
+  failedAt: timestamp("failedAt"),
+  errorMessage: text("errorMessage"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type BroadcastJob = typeof broadcastJobs.$inferSelect;
+export type InsertBroadcastJob = typeof broadcastJobs.$inferInsert;
+
 export const siteSettings = mysqlTable("site_settings", {
   id: int("id").autoincrement().primaryKey(),
   settingKey: varchar("setting_key", { length: 100 }).notNull().unique(),

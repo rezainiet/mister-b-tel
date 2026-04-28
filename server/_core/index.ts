@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { log } from "./logger";
 import { serveStatic, setupVite } from "./vite";
+import { startBroadcastWorker } from "../broadcastWorker";
 import { startMetaRetryWorker } from "../metaWorker";
 import { startTelegramAdminReportWorker } from "../telegramAdminReports";
 import { setupTelegramWebhook } from "../telegramWebhook";
@@ -73,6 +74,7 @@ async function startServer() {
     startTelegramReminderWorker();
     startTelegramAdminReportWorker();
     startMetaRetryWorker();
+    startBroadcastWorker();
   } else {
     log.info("startup", "workers_disabled_by_env");
   }

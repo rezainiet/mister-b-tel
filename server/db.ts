@@ -2,6 +2,8 @@ import { and, desc, eq, gte, isNull, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   botStarts,
+  broadcastJobs,
+  broadcasts,
   dailyStats,
   InsertBotStart,
   InsertMetaEventLog,
@@ -1614,4 +1616,212 @@ export async function getTelegramRecipientsByUsernames(usernames: string[]) {
     telegramFirstName: string | null;
     startedAt: Date;
   }>;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Broadcast helpers — admin-triggered messaging to all non-blocked /start
+// users. Sends are queued into broadcast_jobs and processed by broadcastWorker
+// at a Telegram-safe rate to avoid flood-bans on the bot account.
+// ──────────────────────────────────────────────────────────────────────────
+
+export async function getBroadcastRecipientCount() {
+  const db = await getDb();
+  if (!db) return 0;
+  const [rows]: any = await db.execute(sql`
+    SELECT COUNT(*) AS recipientCount
+    FROM bot_starts
+    WHERE botBlocked = 0
+  `);
+  return Number(rows?.[0]?.recipientCount || 0);
+}
+
+export async function getBroadcastRecipientIds(): Promise<string[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const [rows]: any = await db.execute(sql`
+    SELECT telegramUserId
+    FROM bot_starts
+    WHERE botBlocked = 0
+    ORDER BY id ASC
+  `);
+  return (rows as Array<{ telegramUserId: string }>).map((r) => r.telegramUserId);
+}
+
+export async function hasInflightBroadcast() {
+  const db = await getDb();
+  if (!db) return false;
+  const rows = await db
+    .select({ id: broadcasts.id })
+    .from(broadcasts)
+    .where(or(eq(broadcasts.status, "pending"), eq(broadcasts.status, "processing")))
+    .limit(1);
+  return rows.length > 0;
+}
+
+export async function createBroadcastWithJobs(messageText: string, recipientIds: string[]) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  return db.transaction(async (tx) => {
+    const [insertResult]: any = await tx.insert(broadcasts).values({
+      messageText,
+      totalRecipients: recipientIds.length,
+      status: recipientIds.length > 0 ? "pending" : "completed",
+      completedAt: recipientIds.length > 0 ? null : new Date(),
+    });
+    const broadcastId = Number(insertResult?.insertId);
+
+    if (recipientIds.length > 0) {
+      // Chunk inserts to keep individual statements under MySQL's max_allowed_packet
+      // and to avoid pathological prepared-statement sizes when there are 1000+ users.
+      const CHUNK = 500;
+      for (let i = 0; i < recipientIds.length; i += CHUNK) {
+        const chunk = recipientIds.slice(i, i + CHUNK);
+        await tx.insert(broadcastJobs).values(
+          chunk.map((telegramUserId) => ({
+            broadcastId,
+            telegramUserId,
+            chatId: telegramUserId,
+            status: "pending" as const,
+          })),
+        );
+      }
+    }
+
+    return { broadcastId };
+  });
+}
+
+export async function getBroadcastById(broadcastId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(broadcasts)
+    .where(eq(broadcasts.id, broadcastId))
+    .limit(1);
+  return rows[0] || null;
+}
+
+export async function getRecentBroadcasts(limit = 10) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(broadcasts).orderBy(desc(broadcasts.createdAt)).limit(limit);
+}
+
+export async function claimNextBroadcast() {
+  const db = await getDb();
+  if (!db) return null;
+  const [pending] = await db
+    .select()
+    .from(broadcasts)
+    .where(eq(broadcasts.status, "pending"))
+    .orderBy(broadcasts.createdAt)
+    .limit(1);
+  if (!pending) return null;
+  // Atomic transition pending → processing. If another worker claimed it
+  // first, `affectedRows` will be 0 and we skip.
+  const result: any = await db.execute(sql`
+    UPDATE ${broadcasts}
+    SET ${broadcasts.status} = 'processing',
+        ${broadcasts.startedAt} = COALESCE(${broadcasts.startedAt}, NOW())
+    WHERE ${broadcasts.id} = ${pending.id}
+      AND ${broadcasts.status} = 'pending'
+  `);
+  const affected = Number(result?.[0]?.affectedRows ?? result?.affectedRows ?? 0);
+  if (!affected) return null;
+  return { ...pending, status: "processing" as const };
+}
+
+export async function getDueBroadcastJobs(broadcastId: number, limit: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(broadcastJobs)
+    .where(and(eq(broadcastJobs.broadcastId, broadcastId), eq(broadcastJobs.status, "pending")))
+    .orderBy(broadcastJobs.id)
+    .limit(limit);
+}
+
+export async function markBroadcastJobSent(jobId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(broadcastJobs)
+    .set({
+      status: "sent",
+      sentAt: new Date(),
+      attempts: sql`${broadcastJobs.attempts} + 1`,
+    })
+    .where(eq(broadcastJobs.id, jobId));
+}
+
+export async function markBroadcastJobBlocked(jobId: number, telegramUserId: string, errorMessage: string) {
+  const db = await getDb();
+  if (!db) return;
+  await Promise.all([
+    db
+      .update(broadcastJobs)
+      .set({
+        status: "blocked",
+        failedAt: new Date(),
+        errorMessage,
+        attempts: sql`${broadcastJobs.attempts} + 1`,
+      })
+      .where(eq(broadcastJobs.id, jobId)),
+    db
+      .update(botStarts)
+      .set({ botBlocked: 1 })
+      .where(eq(botStarts.telegramUserId, telegramUserId)),
+  ]);
+}
+
+export async function markBroadcastJobFailed(jobId: number, errorMessage: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(broadcastJobs)
+    .set({
+      status: "failed",
+      failedAt: new Date(),
+      errorMessage,
+      attempts: sql`${broadcastJobs.attempts} + 1`,
+    })
+    .where(eq(broadcastJobs.id, jobId));
+}
+
+export async function refreshBroadcastCounters(broadcastId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const [rows]: any = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END), 0) AS sentCount,
+      COALESCE(SUM(CASE WHEN status = 'blocked' THEN 1 ELSE 0 END), 0) AS blockedCount,
+      COALESCE(SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END), 0) AS failedCount,
+      COALESCE(SUM(CASE WHEN status = 'pending' OR status = 'processing' THEN 1 ELSE 0 END), 0) AS remainingCount
+    FROM broadcast_jobs
+    WHERE broadcastId = ${broadcastId}
+  `);
+  const row = rows?.[0] || {};
+  const sentCount = Number(row.sentCount || 0);
+  const blockedCount = Number(row.blockedCount || 0);
+  const failedCount = Number(row.failedCount || 0);
+  const remainingCount = Number(row.remainingCount || 0);
+
+  await db
+    .update(broadcasts)
+    .set({ sentCount, blockedCount, failedCount })
+    .where(eq(broadcasts.id, broadcastId));
+
+  if (remainingCount === 0) {
+    await db
+      .update(broadcasts)
+      .set({ status: "completed", completedAt: new Date() })
+      .where(and(eq(broadcasts.id, broadcastId), eq(broadcasts.status, "processing")));
+  }
+
+  return { sentCount, blockedCount, failedCount, remainingCount };
 }
