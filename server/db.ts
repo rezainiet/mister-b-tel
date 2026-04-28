@@ -1500,7 +1500,7 @@ export async function getDailyReportStats() {
   const [rows]: any = await db.execute(sql`
     SELECT
       COALESCE(SUM(CASE WHEN DATE(joinedAt) = CURRENT_DATE() - INTERVAL 1 DAY THEN 1 ELSE 0 END), 0) AS todayJoins,
-      COALESCE(SUM(CASE WHEN DATE(joinedAt) = CURRENT_DATE() - INTERVAL 1 DAY AND metaEventSent = 'sent' THEN 1 ELSE 0 END), 0) AS todayMetaJoins,
+      COALESCE(SUM(CASE WHEN DATE(joinedAt) = CURRENT_DATE() - INTERVAL 1 DAY AND metaSubscribeStatus = 'sent' THEN 1 ELSE 0 END), 0) AS todayMetaJoins,
       COALESCE(SUM(CASE WHEN DATE(reminderSentAt) = CURRENT_DATE() - INTERVAL 1 DAY THEN 1 ELSE 0 END), 0) AS todayReminders1,
       COALESCE(SUM(CASE WHEN DATE(reminder2SentAt) = CURRENT_DATE() - INTERVAL 1 DAY THEN 1 ELSE 0 END), 0) AS todayReminders2,
       COALESCE(SUM(CASE WHEN DATE(reminder3SentAt) = CURRENT_DATE() - INTERVAL 1 DAY THEN 1 ELSE 0 END), 0) AS todayReminders3,
