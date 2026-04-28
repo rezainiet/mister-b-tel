@@ -22,15 +22,26 @@
         sessionStorage.setItem("misterb_pv_event_id", _pvEventId);
       } catch (e) {}
 
-      // Manually create the canonical Meta browser cookie (_fbp) before any
-      // React code runs, so the very first server PageView captures it.
-      // Format: fb.<subdomainIndex=1>.<timestamp>.<random>
+      // Manually create the canonical Meta browser cookies (_fbp / _fbc)
+      // before any React code runs, so the very first server PageView
+      // captures them. _fbc must be written from ?fbclid synchronously —
+      // fbevents.js writes it on its own first run, which is too late
+      // for the first PageView CAPI call we issue from React.
+      // Format: fb.<subdomainIndex=1>.<timestamp>.<value>
       try {
+        var _fbCookieMaxAge = 60 * 60 * 24 * 90; // 90 days, matches Meta lifetime
         if (!/(?:^|; )_fbp=/.test(document.cookie)) {
           var _fbpRand = Math.floor(Math.random() * 1e16).toString();
           var _fbpValue = "fb.1." + Date.now() + "." + _fbpRand;
-          var _fbpMaxAge = 60 * 60 * 24 * 90; // 90 days, matches Meta lifetime
-          document.cookie = "_fbp=" + _fbpValue + "; Path=/; Max-Age=" + _fbpMaxAge + "; SameSite=Lax";
+          document.cookie = "_fbp=" + _fbpValue + "; Path=/; Max-Age=" + _fbCookieMaxAge + "; SameSite=Lax";
+        }
+        if (!/(?:^|; )_fbc=/.test(document.cookie)) {
+          var _fbclidMatch = (window.location.search || "").match(/[?&]fbclid=([^&#]+)/);
+          if (_fbclidMatch && _fbclidMatch[1]) {
+            var _fbclid = decodeURIComponent(_fbclidMatch[1]);
+            var _fbcValue = "fb.1." + Date.now() + "." + _fbclid;
+            document.cookie = "_fbc=" + _fbcValue + "; Path=/; Max-Age=" + _fbCookieMaxAge + "; SameSite=Lax";
+          }
         }
       } catch (e) {}
     </script>

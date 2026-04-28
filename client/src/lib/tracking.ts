@@ -101,6 +101,27 @@ function getFbpValue() {
   return ensureFbpCookie();
 }
 
+function getFbcValue() {
+  // index.html bootstraps _fbc from ?fbclid before React runs. Read it back
+  // here so we can forward it to the server CAPI alongside fbp. If the cookie
+  // wasn't set (no fbclid in the URL), fall back to building one from the
+  // current URL — covers SPA navigations where fbclid arrived after first paint.
+  if (typeof document === "undefined") return undefined;
+  const existing = getCookie("_fbc");
+  if (existing) return existing;
+  if (typeof window === "undefined") return undefined;
+  const fbclid = new URLSearchParams(window.location.search).get("fbclid");
+  if (!fbclid) return undefined;
+  const fbc = `fb.1.${Date.now()}.${fbclid}`;
+  setCookie("_fbc", fbc, 60 * 60 * 24 * 90);
+  return fbc;
+}
+
+function getFbclidValue() {
+  if (typeof window === "undefined") return undefined;
+  return new URLSearchParams(window.location.search).get("fbclid") || undefined;
+}
+
 function getCurrentUtmParams() {
   if (typeof window === "undefined") {
     return {
@@ -255,6 +276,8 @@ async function postTrackingRecord(input: {
             sessionToken: input.sessionToken,
             funnelToken: input.funnelToken,
             fbp: getFbpValue(),
+            fbc: getFbcValue(),
+            fbclid: getFbclidValue(),
           },
         },
       }),
