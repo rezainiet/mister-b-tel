@@ -8,6 +8,7 @@ vi.mock("./db", () => ({
   createMetaEventLog: vi.fn().mockResolvedValue(undefined),
   updateMetaEventLog: vi.fn().mockResolvedValue(undefined),
   getUtmSessionByToken: vi.fn().mockResolvedValue(undefined),
+  getLatestUtmSessionByFunnelToken: vi.fn().mockResolvedValue(undefined),
   // dashboard + admin (called via setting endpoints; mock as no-ops)
   getAllSettings: vi.fn().mockResolvedValue([]),
   getDashboardStats: vi.fn(),

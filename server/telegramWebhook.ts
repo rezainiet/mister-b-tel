@@ -188,17 +188,13 @@ async function fireSubscribeForStart(args: {
   ua: string | null;
 }) {
   const existing = await getBotStartByTelegramUserId(args.telegramUserId);
-  // Idempotent: only fire once per user. Subsequent /starts skip Meta if it
-  // was already sent. The metaWorker handles retries for failed/retrying.
-  if (existing?.metaSubscribeStatus === "sent") {
-    return;
-  }
-  if (
-    existing?.metaSubscribeStatus &&
-    ["retrying", "failed", "queued"].includes(existing.metaSubscribeStatus)
-  ) {
-    // A prior /start already created the meta_event_log row — let the
-    // metaWorker's retry logic drive it to completion. Don't double-create.
+  // Idempotent: only fire once per user. Subsequent /starts skip Meta if a
+  // log row already exists in any post-creation state — metaWorker drives
+  // retrying/failed rows to completion, sent rows are done, abandoned rows
+  // are intentionally terminal. Only "pending" (the initial enum default
+  // before any send attempt) means we still need to create the log row.
+  const TERMINAL_OR_INFLIGHT = new Set(["sent", "retrying", "failed", "abandoned"]);
+  if (existing?.metaSubscribeStatus && TERMINAL_OR_INFLIGHT.has(existing.metaSubscribeStatus)) {
     return;
   }
 
@@ -495,21 +491,22 @@ export function setupTelegramWebhook(app: Express) {
 
       // Fire Meta Subscribe at /start time (the conversion moment) — not at
       // join time. /start is the optimization signal we want Meta to learn.
-      // Skip for organic_start (no session/funnel attribution) to keep the
-      // optimization signal clean.
-      const isAttributed = Boolean(session) || Boolean(decoded?.sessionToken) || Boolean(decoded?.funnelToken);
-      if (isAttributed) {
-        await fireSubscribeForStart({
-          telegramUserId: userId,
-          telegramUsername: telegramMessage.from.username,
-          eventTime: telegramMessage.date,
-          session,
-          sessionToken: decoded?.sessionToken || linkage?.sessionToken || session?.sessionToken || null,
-          funnelToken: decoded?.funnelToken || linkage?.funnelToken || session?.funnelToken || null,
-          ip,
-          ua,
-        });
-      }
+      // Always fire: gating on "attributed" was dropping real ad-driven
+      // conversions whose session token didn't survive (Telegram payload
+      // truncation, expired cookie, race on cold backend). Subscribe with
+      // whatever context we have; Meta tolerates missing attribution and
+      // will use IP/UA fallback. The bot_starts row keeps the
+      // organic_start/attributed_start label for our own analytics.
+      await fireSubscribeForStart({
+        telegramUserId: userId,
+        telegramUsername: telegramMessage.from.username,
+        eventTime: telegramMessage.date,
+        session,
+        sessionToken: decoded?.sessionToken || linkage?.sessionToken || session?.sessionToken || null,
+        funnelToken: decoded?.funnelToken || linkage?.funnelToken || session?.funnelToken || null,
+        ip,
+        ua,
+      });
 
       await scheduleTelegramReminderSequence({
         telegramUserId: userId,

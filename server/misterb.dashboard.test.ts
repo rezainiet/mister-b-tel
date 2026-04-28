@@ -12,6 +12,7 @@ vi.mock("./db", () => ({
   insertUtmSession: vi.fn().mockResolvedValue(undefined),
   markSessionClicked: vi.fn().mockResolvedValue(undefined),
   getUtmSessionByToken: vi.fn().mockResolvedValue(undefined),
+  getLatestUtmSessionByFunnelToken: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("./facebookCapi", () => ({

@@ -42,7 +42,7 @@ import {
 } from "./db";
 import { sendPageView } from "./facebookCapi";
 import { buildServerFbc, retryStoredMetaRequest } from "./metaCapi";
-import { getUtmSessionByToken, getSetting } from "./db";
+import { getLatestUtmSessionByFunnelToken, getUtmSessionByToken, getSetting } from "./db";
 import { syncTelegramGroupUrlContent, TELEGRAM_GROUP_URL_SETTING_KEY, validateTelegramGroupUrl } from "./telegramGroupLink";
 import {
   TELEGRAM_REMINDER_DELAY_BOUNDS,
@@ -242,6 +242,7 @@ export const appRouter = router({
           sessionToken: z.string().optional(),
           funnelToken: z.string().optional(),
           fbc: z.string().optional(),
+          fbclid: z.string().optional(),
           fbp: z.string().optional(),
           country: z.string().optional(),
         }),
@@ -282,8 +283,17 @@ export const appRouter = router({
         // Resolve the matching landing session so we can build server-side fbc
         // and propagate UTMs into the Meta payload. Without this, ad-driven
         // PageView attribution to fbclid is lost.
-        const session = input.sessionToken ? await getUtmSessionByToken(input.sessionToken) : undefined;
-        const serverFbc = buildServerFbc(session?.fbclid, session?.createdAt);
+        // Fall back to funnelToken when no session yet — race-tolerant when
+        // tracking.createSession is still in flight on cold mobile networks.
+        const session =
+          (input.sessionToken ? await getUtmSessionByToken(input.sessionToken) : undefined) ??
+          (input.funnelToken ? await getLatestUtmSessionByFunnelToken(input.funnelToken) : undefined);
+        // Build serverFbc from whatever fbclid we can find: client-supplied
+        // (current URL) → session row. Without the client-supplied fallback,
+        // first-paint PageViews lose fbc when session creation is in flight.
+        const serverFbc =
+          buildServerFbc(input.fbclid, Date.now()) ||
+          buildServerFbc(session?.fbclid, session?.createdAt);
 
         const capiPayload = {
           visitorId: input.visitorId,
