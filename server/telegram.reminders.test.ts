@@ -56,7 +56,7 @@ describe("telegram reminders", () => {
     );
 
     expect(drafts[0]?.messageText).toContain("Je te renvoie l’accès au canal privé Mister B");
-    expect(drafts[0]?.messageText).toContain("https://t.me/");
+    expect(drafts[0]?.messageText).toContain("https://whatsapp.com/channel/");
     expect(drafts[0]?.messageText).toContain("@MisterBNMB");
   });
 });

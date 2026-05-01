@@ -969,7 +969,7 @@ export default function Dashboard() {
                     type="url"
                     value={telegramGroupUrl}
                     onChange={(event) => setTelegramGroupUrl(event.target.value)}
-                    placeholder="https://t.me/your-group-link"
+                    placeholder="https://t.me/... or https://whatsapp.com/channel/..."
                     className="h-14 w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 text-base text-white outline-none transition focus:border-emerald-400"
                     autoComplete="off"
                   />

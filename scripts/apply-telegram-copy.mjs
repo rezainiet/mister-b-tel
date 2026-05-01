@@ -12,7 +12,7 @@ const entries = [
     [
       "Bienvenue chez Mister B.",
       "Ici, tu vas pouvoir accéder aux nouveautés, aux infos réservées et au contenu privé.",
-      "Rejoins maintenant le canal privé ici → https://t.me/+sdIa7KNoIbNjMTg0",
+      "Rejoins maintenant le canal privé ici → https://whatsapp.com/channel/0029Vb7Gsop1XquZ5XHDOl2W",
       "",
       "Et si tu veux échanger directement avec moi, tu peux aussi me contacter ici : @MisterBNMB",
     ].join("\n"),

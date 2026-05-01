@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { replaceTelegramGroupUrlInText } from "./telegramGroupLink";
+import { replaceTelegramGroupUrlInText, validateTelegramGroupUrl } from "./telegramGroupLink";
 
 const dashboardSource = fs.readFileSync(
   path.resolve(import.meta.dirname, "../client/src/pages/Dashboard.tsx"),
@@ -22,6 +22,27 @@ describe("telegram group link editor", () => {
         nextUrl,
       ),
     ).toBe(`Join here -> ${nextUrl} and keep going`);
+  });
+
+  it("rewrites stored WhatsApp channel links when the group URL changes", () => {
+    const nextUrl = "https://whatsapp.com/channel/NEW";
+    expect(
+      replaceTelegramGroupUrlInText(
+        "Rejoins ici -> https://whatsapp.com/channel/0029Vb7Gsop1XquZ5XHDOl2W et continue",
+        nextUrl,
+      ),
+    ).toBe(`Rejoins ici -> ${nextUrl} et continue`);
+  });
+
+  it("accepts both Telegram and WhatsApp channel hosts in the validator", () => {
+    expect(validateTelegramGroupUrl("https://t.me/+abc").ok).toBe(true);
+    expect(validateTelegramGroupUrl("https://whatsapp.com/channel/0029Vb7Gsop1XquZ5XHDOl2W").ok).toBe(
+      true,
+    );
+    expect(validateTelegramGroupUrl("https://www.whatsapp.com/channel/abc").ok).toBe(true);
+    expect(validateTelegramGroupUrl("https://whatsapp.com/").ok).toBe(false);
+    expect(validateTelegramGroupUrl("https://whatsapp.com/something-else").ok).toBe(false);
+    expect(validateTelegramGroupUrl("https://example.com/channel/abc").ok).toBe(false);
   });
 
   it("adds a dashboard control and save button for editing the Telegram group link", () => {

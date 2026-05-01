@@ -3,10 +3,15 @@ import { telegramReminderJobs } from "../drizzle/schema";
 import { getAllSettings, getDb, getSetting, upsertSetting } from "./db";
 
 export const DEFAULT_TELEGRAM_GROUP_URL =
-  process.env.TELEGRAM_GROUP_URL || "https://t.me/+sdIa7KNoIbNjMTg0";
+  process.env.TELEGRAM_GROUP_URL || "https://whatsapp.com/channel/0029Vb7Gsop1XquZ5XHDOl2W";
 export const TELEGRAM_GROUP_URL_SETTING_KEY = "telegram_group_url";
 
 const ALLOWED_TELEGRAM_HOSTS = new Set(["t.me", "telegram.me", "telegram.org"]);
+const ALLOWED_WHATSAPP_HOSTS = new Set(["whatsapp.com", "www.whatsapp.com"]);
+const ALLOWED_HOSTS = new Set([
+  ...Array.from(ALLOWED_TELEGRAM_HOSTS),
+  ...Array.from(ALLOWED_WHATSAPP_HOSTS),
+]);
 
 export type TelegramGroupUrlValidation =
   | { ok: true; value: string }
@@ -29,15 +34,20 @@ export function validateTelegramGroupUrl(rawValue: string): TelegramGroupUrlVali
     return { ok: false, error: "URL must use http(s)." };
   }
 
-  if (!ALLOWED_TELEGRAM_HOSTS.has(parsed.hostname.toLowerCase())) {
+  const host = parsed.hostname.toLowerCase();
+  if (!ALLOWED_HOSTS.has(host)) {
     return {
       ok: false,
-      error: `URL host must be one of: ${Array.from(ALLOWED_TELEGRAM_HOSTS).join(", ")}.`,
+      error: `URL host must be one of: ${Array.from(ALLOWED_HOSTS).join(", ")}.`,
     };
   }
 
+  if (ALLOWED_WHATSAPP_HOSTS.has(host) && !parsed.pathname.toLowerCase().startsWith("/channel/")) {
+    return { ok: false, error: "WhatsApp URL must be a channel link (e.g. /channel/<id>)." };
+  }
+
   if (!parsed.pathname || parsed.pathname === "/") {
-    return { ok: false, error: "URL must include a Telegram path (e.g. /+inviteCode)." };
+    return { ok: false, error: "URL must include a path (e.g. /+inviteCode or /channel/<id>)." };
   }
 
   // Strip whitespace and reject anything containing whitespace mid-URL — the
@@ -68,6 +78,7 @@ export function replaceTelegramGroupUrlInText(text: string, nextGroupUrl: string
   return text
     .replaceAll("{group_url}", nextGroupUrl)
     .replace(/https?:\/\/t\.me\/[^\s)]+/g, nextGroupUrl)
+    .replace(/https?:\/\/(?:www\.)?whatsapp\.com\/channel\/[^\s)]+/g, nextGroupUrl)
     .trim();
 }
 
