@@ -25,13 +25,20 @@ import {
   buildTelegramAdminReportText,
   isTelegramAdminAuthorized,
 } from "./telegramAdminReports";
-import { buildUrlInlineKeyboard, sendTelegramMessage } from "./telegramBot";
+import {
+  answerCallbackQuery,
+  buildBotDmKeyboard,
+  buildUrlInlineKeyboard,
+  JOINED_WHATSAPP_CALLBACK,
+  sendTelegramMessage,
+} from "./telegramBot";
 import { DEFAULT_TELEGRAM_GROUP_URL, getTelegramGroupUrl } from "./telegramGroupLink";
 import {
   renderTelegramWelcomeMessage,
   scheduleTelegramReminderSequence,
   skipPendingTelegramReminderJobs,
 } from "./telegramReminders";
+import { buildPersonalWhatsappRedirectUrl } from "./whatsappRedirect";
 
 const TELEGRAM_DIRECT_CONTACT = "@MisterBNMB";
 const META_RETRY_DELAY_MS = 5 * 60 * 1000;
@@ -122,6 +129,13 @@ interface TelegramChatMemberUpdate {
   old_chat_member: { user: TelegramUser; status: string };
 }
 
+interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  data?: string;
+  message?: { chat: TelegramChat };
+}
+
 interface TelegramUpdate {
   update_id: number;
   message?: {
@@ -131,6 +145,7 @@ interface TelegramUpdate {
     text?: string;
     new_chat_members?: TelegramUser[];
   };
+  callback_query?: TelegramCallbackQuery;
   chat_member?: TelegramChatMemberUpdate;
   my_chat_member?: TelegramChatMemberUpdate;
 }
@@ -279,6 +294,45 @@ async function fireSubscribeForStart(args: {
       }),
       updateBotStartMetaStatus(args.telegramUserId, "retrying", eventId),
     ]);
+  }
+}
+
+async function handleCallbackQuery(query: TelegramCallbackQuery) {
+  const data = (query.data || "").trim();
+  const userId = String(query.from.id);
+
+  if (data !== JOINED_WHATSAPP_CALLBACK) {
+    // Unknown callback — ack so the spinner stops; ignore the action.
+    await answerCallbackQuery(query.id, "Action inconnue.");
+    return;
+  }
+
+  // Pull existing state so we can be idempotent: pressing the button twice
+  // shouldn't bury the original joinedAt or re-cancel reminders that are
+  // already cancelled.
+  const existing = await getBotStartByTelegramUserId(userId);
+  const wasFirstConfirmation = Boolean(existing && !existing.joinedAt);
+
+  if (wasFirstConfirmation) {
+    await Promise.all([
+      markBotStartJoined(userId),
+      skipPendingTelegramReminderJobs(userId, "joined_group"),
+    ]);
+    log.info("telegramWebhook", "join_self_confirmed", { telegramUserId: userId });
+  }
+
+  await answerCallbackQuery(
+    query.id,
+    wasFirstConfirmation ? "Merci, c'est noté ✅" : "Déjà confirmé ✅",
+  );
+
+  // Send a short confirmation DM the first time only — repeated taps shouldn't
+  // spam the chat.
+  if (wasFirstConfirmation && query.message?.chat?.id) {
+    await sendTelegramMessage(
+      query.message.chat.id,
+      "Merci ! On arrête les rappels. Tu peux me contacter à tout moment ici : @MisterBNMB",
+    );
   }
 }
 
@@ -520,19 +574,26 @@ export function setupTelegramWebhook(app: Express) {
         startedAt: new Date(telegramMessage.date * 1000),
       });
 
-      const [welcomeMsg, currentGroupUrl] = await Promise.all([
-        getSetting("welcome_message"),
-        getTelegramGroupUrl(),
-      ]);
+      const [welcomeMsg] = await Promise.all([getSetting("welcome_message")]);
+      // Render the welcome with the per-user tracked redirect URL instead of
+      // the raw destination — every click on the join link now flows through
+      // /r/wa, which records the conversion + fires Meta Lead. The actual
+      // destination resolves server-side at redirect time.
+      const personalRedirectUrl = buildPersonalWhatsappRedirectUrl(userId);
       const welcomeBody = welcomeMsg
         ? renderTelegramWelcomeMessage(welcomeMsg, {
             firstName: telegramMessage.from.first_name || null,
-            groupUrl: currentGroupUrl,
+            groupUrl: personalRedirectUrl,
           })
-        : buildDefaultWelcomeMessage(currentGroupUrl, telegramMessage.from.first_name || null);
+        : buildDefaultWelcomeMessage(personalRedirectUrl, telegramMessage.from.first_name || null);
       await sendTelegramMessage(telegramMessage.from.id, welcomeBody, {
-        inlineButtons: buildUrlInlineKeyboard(welcomeBody),
+        inlineButtons: buildBotDmKeyboard(welcomeBody),
       });
+    }
+
+    if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query);
+      return;
     }
 
     const memberUpdate = update.chat_member || update.my_chat_member;
@@ -557,6 +618,23 @@ export function setupTelegramWebhook(app: Express) {
   }
 
   app.post("/api/telegram/setup-webhook", async (req: Request, res: Response) => {
+    // Without this guard, anyone on the internet can re-route the bot's
+    // updates to a server they control. WEBHOOK_ADMIN_SECRET must be present
+    // and supplied via the X-Webhook-Admin-Secret header to proceed.
+    const expectedAdminSecret = process.env.WEBHOOK_ADMIN_SECRET || "";
+    if (!expectedAdminSecret) {
+      log.error("telegramWebhook", "setup_webhook_admin_secret_not_configured");
+      res.status(503).json({ error: "Webhook setup is disabled (admin secret not configured)" });
+      return;
+    }
+    const suppliedSecret = req.headers["x-webhook-admin-secret"];
+    const suppliedSecretValue = Array.isArray(suppliedSecret) ? suppliedSecret[0] : suppliedSecret;
+    if (!suppliedSecretValue || !timingSafeEqualString(expectedAdminSecret, suppliedSecretValue)) {
+      log.warn("telegramWebhook", "setup_webhook_unauthorized");
+      res.status(403).json({ error: "Unauthorized" });
+      return;
+    }
+
     const { webhookUrl } = req.body as { webhookUrl?: string };
     if (!webhookUrl) {
       res.status(400).json({ error: "webhookUrl is required" });
@@ -574,7 +652,7 @@ export function setupTelegramWebhook(app: Express) {
       body: JSON.stringify({
         url: webhookUrl,
         secret_token: getWebhookSecret(),
-        allowed_updates: ["chat_member", "my_chat_member", "message"],
+        allowed_updates: ["chat_member", "my_chat_member", "message", "callback_query"],
       }),
     });
 

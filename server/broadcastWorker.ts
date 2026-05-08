@@ -92,8 +92,16 @@ export function startBroadcastWorker() {
       if (!isLeader) return;
       await processOneTick();
     } catch (error) {
+      // The previous log only carried error.message, which on Drizzle errors
+      // is the "Failed query: …" prefix without the underlying mysql2 cause.
+      // Surface the cause so production lease-query failures are diagnosable.
+      const cause = (error as { cause?: unknown })?.cause;
       log.error("broadcastWorker", "worker_error", {
         error: error instanceof Error ? error.message : String(error),
+        causeMessage: cause instanceof Error ? cause.message : cause ? String(cause) : undefined,
+        causeCode: (cause as { code?: string } | undefined)?.code,
+        causeErrno: (cause as { errno?: number } | undefined)?.errno,
+        causeSqlState: (cause as { sqlState?: string } | undefined)?.sqlState,
       });
     } finally {
       workerRunning = false;

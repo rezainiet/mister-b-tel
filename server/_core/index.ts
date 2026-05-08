@@ -17,6 +17,7 @@ import { startMetaRetryWorker } from "../metaWorker";
 import { startTelegramAdminReportWorker } from "../telegramAdminReports";
 import { setupTelegramWebhook } from "../telegramWebhook";
 import { startTelegramReminderWorker } from "../telegramReminders";
+import { setupWhatsappRedirectRoute } from "../whatsappRedirect";
 
 async function runPendingMigrations() {
   const url = process.env.DATABASE_URL;
@@ -157,6 +158,7 @@ async function startServer() {
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   setupTelegramWebhook(app);
+  setupWhatsappRedirectRoute(app);
   if (process.env.WORKERS_ENABLED?.toLowerCase() !== "false") {
     startTelegramReminderWorker();
     startTelegramAdminReportWorker();

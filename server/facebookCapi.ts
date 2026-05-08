@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { MetaSendResult, postMetaPayload } from "./metaCapi";
 
-type ConversionEventName = "PageView" | "Subscribe" | "Contact" | "CustomEvent";
+type ConversionEventName = "PageView" | "Subscribe" | "Contact" | "Lead" | "CustomEvent";
 
 export type ConversionPayload = {
   visitorId?: string;
@@ -52,6 +52,19 @@ function buildCustomData(eventName: ConversionEventName, payload: ConversionPayl
       content_category: "Contact privé Telegram",
       contact_source: payload.source || "button",
     };
+  }
+
+  if (eventName === "Lead") {
+    const defaults = {
+      content_name: "WhatsApp Channel Click",
+      content_category: "WhatsApp",
+      lead_source: payload.source || "whatsapp_click",
+      currency: "EUR",
+      value: "0.00",
+    };
+    return payload.customData && Object.keys(payload.customData).length > 0
+      ? { ...defaults, ...payload.customData }
+      : defaults;
   }
 
   if (eventName === "CustomEvent") {

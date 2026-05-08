@@ -3,8 +3,9 @@ import { botStarts, telegramReminderJobs } from "../drizzle/schema";
 import { tryAcquireLease } from "./_core/leaderLease";
 import { log } from "./_core/logger";
 import { getDb, getSetting } from "./db";
-import { buildUrlInlineKeyboard, sendTelegramMessage } from "./telegramBot";
+import { buildBotDmKeyboard, sendTelegramMessage } from "./telegramBot";
 import { DEFAULT_TELEGRAM_GROUP_URL, getTelegramGroupUrl } from "./telegramGroupLink";
+import { buildPersonalWhatsappRedirectUrl } from "./whatsappRedirect";
 
 const WORKER_NAME = "telegram_reminders";
 
@@ -180,7 +181,13 @@ export async function getResolvedReminderSteps(): Promise<ResolvedReminderStep[]
 
 export async function buildTelegramReminderDrafts(input: BuildReminderDraftsInput) {
   const startedAt = input.startedAt || new Date();
-  const [steps, groupUrl] = await Promise.all([getResolvedReminderSteps(), getTelegramGroupUrl()]);
+  // We deliberately render each user's reminder text with their personal
+  // tracked-redirect URL instead of the raw destination, so every reminder
+  // click gets logged + Meta Lead-fired through /r/wa. getTelegramGroupUrl()
+  // is intentionally still consulted (and would be used here if the redirect
+  // env breaks), but the personal URL is preferred.
+  const [steps] = await Promise.all([getResolvedReminderSteps(), getTelegramGroupUrl()]);
+  const personalRedirectUrl = buildPersonalWhatsappRedirectUrl(input.telegramUserId);
 
   return steps.map((step) => ({
     telegramUserId: input.telegramUserId,
@@ -188,7 +195,7 @@ export async function buildTelegramReminderDrafts(input: BuildReminderDraftsInpu
     reminderKey: step.key,
     messageText: renderTelegramReminderMessage(step.template, {
       firstName: input.firstName,
-      groupUrl,
+      groupUrl: personalRedirectUrl,
     }),
     dueAt: new Date(startedAt.getTime() + step.delayMs),
   }));
@@ -400,7 +407,7 @@ export async function processDueTelegramReminderJobs() {
     }
 
     const result = await sendTelegramMessage(job.chatId, job.messageText, {
-      inlineButtons: buildUrlInlineKeyboard(job.messageText),
+      inlineButtons: buildBotDmKeyboard(job.messageText),
     });
 
     if (result.ok) {

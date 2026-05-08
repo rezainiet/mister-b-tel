@@ -56,7 +56,9 @@ describe("telegram reminders", () => {
     );
 
     expect(drafts[0]?.messageText).toContain("Je te renvoie l’accès au canal privé Mister B");
-    expect(drafts[0]?.messageText).toContain("https://whatsapp.com/channel/");
+    // Reminders now route through the per-user tracked redirect (/r/wa) so
+    // every click is logged + Meta Lead-fired before landing on WhatsApp.
+    expect(drafts[0]?.messageText).toContain("/r/wa?u=123456");
     expect(drafts[0]?.messageText).toContain("@MisterBNMB");
   });
 });

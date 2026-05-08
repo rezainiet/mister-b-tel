@@ -459,8 +459,8 @@ const SubscriberDiagnosticRow = memo(function SubscriberDiagnosticRow({ row }: {
           <p className="mt-1 text-sm text-slate-200">{formatRelativeTime(row.startedAt)}</p>
         </div>
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
-          <p className="uppercase tracking-[0.16em] text-slate-500">Ajout canal</p>
-          <p className="mt-1 text-sm text-slate-200">{row.joinedAt ? formatDateTime(row.joinedAt) : "Pas encore confirmé"}</p>
+          <p className="uppercase tracking-[0.16em] text-slate-500">Clic WhatsApp</p>
+          <p className="mt-1 text-sm text-slate-200">{row.joinedAt ? formatDateTime(row.joinedAt) : "Pas encore cliqué"}</p>
         </div>
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-3 py-2.5">
           <p className="uppercase tracking-[0.16em] text-slate-500">Meta</p>
@@ -515,8 +515,8 @@ const SubscriberConversionRow = memo(function SubscriberConversionRow({ row }: {
           <p className="mt-1 text-sm text-slate-200">{formatDateTime(row.startedAt)}</p>
         </div>
         <div>
-          <p className="uppercase tracking-[0.16em] text-slate-500">Ajout canal</p>
-          <p className="mt-1 text-sm text-slate-200">{row.joinedAt ? formatDateTime(row.joinedAt) : "Pas encore confirmé"}</p>
+          <p className="uppercase tracking-[0.16em] text-slate-500">Clic WhatsApp</p>
+          <p className="mt-1 text-sm text-slate-200">{row.joinedAt ? formatDateTime(row.joinedAt) : "Pas encore cliqué"}</p>
         </div>
         <div>
           <p className="uppercase tracking-[0.16em] text-slate-500">Meta sent</p>
@@ -1181,9 +1181,9 @@ export default function Dashboard() {
                 icon={Power}
               />
               <MetricCard
-                title="Membres rejoints"
+                title="Clics WhatsApp"
                 value={formatInt(membersJoined)}
-                subtitle="Bot start puis ajout confirmé"
+                subtitle="Clic vers le canal WhatsApp ou auto-confirmation"
                 color="green"
                 icon={UserPlus}
               />
@@ -1195,9 +1195,9 @@ export default function Dashboard() {
                 icon={MessageCircle}
               />
               <MetricCard
-                title="Taux bot → membre"
+                title="Taux bot → WhatsApp"
                 value={botToMemberRate}
-                subtitle={`${formatInt(pendingAfterStart)} start(s) sans ajout confirmé`}
+                subtitle={`${formatInt(pendingAfterStart)} start(s) sans clic WhatsApp`}
                 color="yellow"
                 icon={Gauge}
               />

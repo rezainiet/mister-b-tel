@@ -8,7 +8,9 @@ describe("Dashboard Telegram labels", () => {
     expect(dashboardSource).toContain('whatsapp_click: "Telegram bot click"');
     expect(dashboardSource).toContain('title="Clic bot Telegram"');
     expect(dashboardSource).toContain('title="Start bot"');
-    expect(dashboardSource).toContain('title="Membres rejoints"');
+    // Renamed when the funnel exit moved from a Telegram channel to a WhatsApp
+    // channel reachable through the /r/wa tracked redirect.
+    expect(dashboardSource).toContain('title="Clics WhatsApp"');
     expect(dashboardSource).toContain('title="Contact direct"');
     expect(dashboardSource).toContain('>Clic bot</th>');
     expect(dashboardSource).toContain('>Contact direct</th>');

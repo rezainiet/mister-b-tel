@@ -13,7 +13,7 @@ describe("Dashboard Telegram funnel", () => {
   it("renders the clearer Telegram funnel cards and consumes the bot-start overview query", () => {
     expect(dashboardSource).toContain('title="Clic bot Telegram"');
     expect(dashboardSource).toContain('title="Start bot"');
-    expect(dashboardSource).toContain('title="Membres rejoints"');
+    expect(dashboardSource).toContain('title="Clics WhatsApp"');
     expect(dashboardSource).toContain('title="Contact direct"');
     expect(dashboardSource).toContain("trpc.dashboard.telegramOverview.useQuery");
     expect(dashboardSource).toContain("botToMemberRate");

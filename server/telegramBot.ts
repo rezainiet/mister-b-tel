@@ -31,7 +31,9 @@ export type SendTelegramMessageResult = {
   transient?: boolean;
 };
 
-export type TelegramInlineButton = { text: string; url: string };
+export type TelegramInlineButton =
+  | { text: string; url: string }
+  | { text: string; callback_data: string };
 
 export type SendTelegramMessageOptions = {
   // Telegram parse_mode. Default is unset (plain text). Pass "HTML" or
@@ -88,6 +90,52 @@ export function buildUrlInlineKeyboard(
     if (unique.length >= 3) break;
   }
   return unique.map((url) => [{ text: buttonLabelForUrl(url), url }]);
+}
+
+// The callback_data string the webhook handler matches on. Keep short — Telegram
+// caps callback_data at 64 bytes — and stable so old buttons keep working.
+export const JOINED_WHATSAPP_CALLBACK = "joined_wa";
+
+/**
+ * Build the inline keyboard for welcome / reminder DMs.
+ *
+ * Layout (top to bottom):
+ *   1. URL buttons auto-detected from the message text (e.g. the WhatsApp
+ *      tracked-redirect URL). These exit the chat to the destination.
+ *   2. A callback button "J'ai rejoint le canal" that fires a webhook update
+ *      so the bot can mark the user as joined and stop further reminders.
+ *
+ * Returns `undefined` only when there are zero URL buttons AND we don't want
+ * a stray "J'ai rejoint" button on its own — that is never the case for our
+ * welcome/reminder flow, so we always return at least the callback row.
+ */
+export function buildBotDmKeyboard(text: string): TelegramInlineButton[][] {
+  const urlRows = buildUrlInlineKeyboard(text) || [];
+  const callbackRow: TelegramInlineButton[] = [
+    { text: "✅ J'ai rejoint le canal", callback_data: JOINED_WHATSAPP_CALLBACK },
+  ];
+  return [...urlRows, callbackRow];
+}
+
+export async function answerCallbackQuery(
+  callbackQueryId: string,
+  text?: string,
+): Promise<void> {
+  if (!BOT_TOKEN) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        callback_query_id: callbackQueryId,
+        text,
+        show_alert: false,
+      }),
+      signal: AbortSignal.timeout(TELEGRAM_REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    // Ack failures are non-critical — the user already saw the action.
+  }
 }
 
 export async function sendTelegramMessage(
