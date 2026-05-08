@@ -18,16 +18,30 @@ const META_RETRY_DELAY_MS = 5 * 60 * 1000;
 
 /**
  * Build the per-user tracked redirect URL the bot includes in welcome/reminder
- * DMs. Falls back to APP_BASE_URL = mister-b.club so a missing env var doesn't
- * silently produce a broken link in production messages.
+ * DMs.
  *
- * NOTE: this path is `/wa-go` (not `/r/wa`) because Cloudflare in front of
- * mister-b.club intercepts `/r/*` and serves the SPA HTML, so any `/r/...`
- * route never reaches the Railway origin. If you ever clean up the Cloudflare
- * rules, you can shorten this back to `/r/wa`.
+ * Resolution order (first non-empty wins):
+ *   1. WHATSAPP_REDIRECT_BASE_URL — explicit override.
+ *   2. RAILWAY_PUBLIC_DOMAIN — auto-injected by Railway, e.g.
+ *      "mister-b-tel-production.up.railway.app". This is the path that
+ *      ALWAYS hits the Express origin in production, regardless of any
+ *      Cloudflare front-door config on the marketing domain.
+ *   3. APP_BASE_URL — generic site base, used by other CAPI features.
+ *   4. https://mister-b.club — last-resort fallback.
+ *
+ * The bot DMs hide the URL behind an inline button label, so URL prettiness
+ * doesn't matter — reachability does. Cloudflare in front of mister-b.club
+ * intercepts non-/api/* paths and serves the SPA HTML, so the redirect can
+ * never reach origin via that domain. Pinning to RAILWAY_PUBLIC_DOMAIN is
+ * the safest default.
  */
 export function buildPersonalWhatsappRedirectUrl(telegramUserId: string | number) {
-  const base = (process.env.APP_BASE_URL || "https://mister-b.club").replace(/\/+$/, "");
+  const explicit = process.env.WHATSAPP_REDIRECT_BASE_URL;
+  const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : undefined;
+  const fallback = process.env.APP_BASE_URL || "https://mister-b.club";
+  const base = (explicit || railwayDomain || fallback).replace(/\/+$/, "");
   return `${base}/wa-go?u=${encodeURIComponent(String(telegramUserId))}`;
 }
 
