@@ -20,10 +20,15 @@ const META_RETRY_DELAY_MS = 5 * 60 * 1000;
  * Build the per-user tracked redirect URL the bot includes in welcome/reminder
  * DMs. Falls back to APP_BASE_URL = mister-b.club so a missing env var doesn't
  * silently produce a broken link in production messages.
+ *
+ * NOTE: this path is `/wa-go` (not `/r/wa`) because Cloudflare in front of
+ * mister-b.club intercepts `/r/*` and serves the SPA HTML, so any `/r/...`
+ * route never reaches the Railway origin. If you ever clean up the Cloudflare
+ * rules, you can shorten this back to `/r/wa`.
  */
 export function buildPersonalWhatsappRedirectUrl(telegramUserId: string | number) {
   const base = (process.env.APP_BASE_URL || "https://mister-b.club").replace(/\/+$/, "");
-  return `${base}/r/wa?u=${encodeURIComponent(String(telegramUserId))}`;
+  return `${base}/wa-go?u=${encodeURIComponent(String(telegramUserId))}`;
 }
 
 function getQueryString(value: unknown): string | undefined {
@@ -34,7 +39,18 @@ function getQueryString(value: unknown): string | undefined {
 }
 
 export function setupWhatsappRedirectRoute(app: Express) {
-  app.get("/r/wa", async (req: Request, res: Response) => {
+  // Both paths are registered: /wa-go is the production-canonical path used
+  // by all bot-DM messages (Cloudflare intercepts /r/* on mister-b.club so
+  // the original /r/wa never reaches origin). /r/wa is kept registered as a
+  // legacy alias for any links from before the rename — they'll work the
+  // moment Cloudflare is reconfigured to pass /r/* through, with no
+  // server-side change needed.
+  const handler = handleWhatsappRedirect;
+  app.get("/wa-go", handler);
+  app.get("/r/wa", handler);
+}
+
+async function handleWhatsappRedirect(req: Request, res: Response) {
     const telegramUserId = getQueryString(req.query.u);
     const suppliedSessionToken = getQueryString(req.query.s);
     const suppliedFunnelToken = getQueryString(req.query.f);
@@ -70,7 +86,6 @@ export function setupWhatsappRedirectRoute(app: Express) {
     });
 
     res.redirect(302, destinationUrl);
-  });
 }
 
 async function recordWhatsappClick(args: {
