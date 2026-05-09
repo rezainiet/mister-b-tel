@@ -1343,6 +1343,24 @@ export async function getRecentBotStartsWithMetaStatus(limit = 50) {
   }>;
 }
 
+/**
+ * Logs a Drizzle query failure with the underlying mysql2 cause attached.
+ * Drizzle's error.message is just "Failed query: <sql>\nparams: <p>" and
+ * never includes the actual MySQL error code or text — without unpacking
+ * `error.cause` we can never tell why a query died in production.
+ */
+function logDebugLogQueryFailure(section: string, error: unknown) {
+  const cause = (error as { cause?: unknown })?.cause;
+  console.error("[getRecentMetaDebugLog]", section, "query_failed", {
+    error: error instanceof Error ? error.message : String(error),
+    causeMessage: cause instanceof Error ? cause.message : cause ? String(cause) : undefined,
+    causeCode: (cause as { code?: string } | undefined)?.code,
+    causeErrno: (cause as { errno?: number } | undefined)?.errno,
+    causeSqlState: (cause as { sqlState?: string } | undefined)?.sqlState,
+    causeSqlMessage: (cause as { sqlMessage?: string } | undefined)?.sqlMessage,
+  });
+}
+
 export async function getRecentMetaDebugLog(limit = 5) {
   const db = await getDb();
   if (!db) {
@@ -1354,123 +1372,159 @@ export async function getRecentMetaDebugLog(limit = 5) {
     };
   }
 
-  const [pageviewRows]: any = await db.execute(sql`
-    SELECT
-      te.id,
-      te.eventType,
-      NULLIF(te.eventSource, '') AS eventSource,
-      NULLIF(te.eventId, '') AS eventId,
-      NULLIF(te.visitorId, '') AS visitorId,
-      NULLIF(te.sessionToken, '') AS sessionToken,
-      NULLIF(te.funnelToken, '') AS funnelToken,
-      NULLIF(te.sourceUrl, '') AS sourceUrl,
-      NULLIF(te.referrer, '') AS referrer,
-      NULLIF(te.country, '') AS country,
-      NULLIF(te.ip, '') AS ip,
-      NULLIF(te.userAgent, '') AS userAgent,
-      te.createdAt,
-      mel.status AS metaStatus,
-      mel.httpStatus,
-      mel.errorMessage,
-      mel.attemptCount,
-      mel.retryable,
-      mel.completedAt AS metaCompletedAt
-    FROM tracking_events te
-    LEFT JOIN meta_event_logs mel ON mel.eventId = te.eventId AND mel.eventScope = 'pageview'
-    WHERE te.eventType = 'pageview'
-    ORDER BY te.createdAt DESC
-    LIMIT ${limit}
-  `);
+  // Each section is independently wrapped: the dashboard already handles
+  // empty arrays gracefully, but a 500 from any single subquery breaks the
+  // whole panel. Returning [] for the failing section keeps the rest visible
+  // while logging the full mysql2 cause for post-mortem.
+  let pageviewRows: any[] = [];
+  let sessionRows: any[] = [];
+  let joinRows: any[] = [];
+  let subscribeRows: any[] = [];
 
-  const [sessionRows]: any = await db.execute(sql`
-    SELECT
-      id,
-      sessionToken,
-      NULLIF(funnelToken, '') AS funnelToken,
-      NULLIF(visitorId, '') AS visitorId,
-      COALESCE(NULLIF(utmSource, ''), 'Direct / inconnu') AS utmSource,
-      COALESCE(NULLIF(utmMedium, ''), '—') AS utmMedium,
-      COALESCE(NULLIF(utmCampaign, ''), '—') AS utmCampaign,
-      COALESCE(NULLIF(utmContent, ''), '—') AS utmContent,
-      COALESCE(NULLIF(utmTerm, ''), '—') AS utmTerm,
-      NULLIF(fbclid, '') AS fbclid,
-      NULLIF(fbp, '') AS fbp,
-      NULLIF(ipAddress, '') AS ipAddress,
-      NULLIF(userAgent, '') AS userAgent,
-      NULLIF(referrer, '') AS referrer,
-      NULLIF(landingPage, '') AS landingPage,
-      clickedTelegramLink,
-      clickedAt,
-      createdAt
-    FROM utm_sessions
-    ORDER BY createdAt DESC
-    LIMIT ${limit}
-  `);
+  try {
+    const [rows]: any = await db.execute(sql`
+      SELECT
+        te.id,
+        te.eventType,
+        NULLIF(te.eventSource, '') AS eventSource,
+        NULLIF(te.eventId, '') AS eventId,
+        NULLIF(te.visitorId, '') AS visitorId,
+        NULLIF(te.sessionToken, '') AS sessionToken,
+        NULLIF(te.funnelToken, '') AS funnelToken,
+        NULLIF(te.sourceUrl, '') AS sourceUrl,
+        NULLIF(te.referrer, '') AS referrer,
+        NULLIF(te.country, '') AS country,
+        NULLIF(te.ip, '') AS ip,
+        NULLIF(te.userAgent, '') AS userAgent,
+        te.createdAt,
+        mel.status AS metaStatus,
+        mel.httpStatus,
+        mel.errorMessage,
+        mel.attemptCount,
+        mel.retryable,
+        mel.completedAt AS metaCompletedAt
+      FROM tracking_events te
+      LEFT JOIN meta_event_logs mel ON mel.eventId = te.eventId AND mel.eventScope = 'pageview'
+      WHERE te.eventType = 'pageview'
+      ORDER BY te.createdAt DESC
+      LIMIT ${limit}
+    `);
+    pageviewRows = rows;
+  } catch (error) {
+    logDebugLogQueryFailure("pageviews", error);
+  }
 
-  const [joinRows]: any = await db.execute(sql`
-    SELECT
-      tj.id,
-      tj.telegramUserId,
-      tj.telegramUsername,
-      tj.telegramFirstName,
-      tj.channelTitle,
-      COALESCE(mel.status, tj.metaEventSent, 'pending') AS metaEventSent,
-      tj.metaEventId,
-      COALESCE(mel.completedAt, tj.metaEventSentAt) AS metaEventSentAt,
-      COALESCE(NULLIF(tj.utmSource, ''), 'Direct / inconnu') AS utmSource,
-      COALESCE(NULLIF(tj.utmMedium, ''), '—') AS utmMedium,
-      COALESCE(NULLIF(tj.utmCampaign, ''), '—') AS utmCampaign,
-      NULLIF(tj.sessionToken, '') AS sessionToken,
-      NULLIF(tj.funnelToken, '') AS funnelToken,
-      NULLIF(tj.attributionStatus, '') AS attributionStatus,
-      NULLIF(tj.fbclid, '') AS fbclid,
-      NULLIF(tj.ipAddress, '') AS ipAddress,
-      NULLIF(tj.userAgent, '') AS userAgent,
-      tj.joinedAt,
-      tj.createdAt,
-      mel.errorMessage,
-      mel.httpStatus,
-      mel.attemptCount,
-      mel.retryable
-    FROM telegram_joins tj
-    LEFT JOIN meta_event_logs mel ON mel.eventId = tj.metaEventId
-    ORDER BY tj.joinedAt DESC
-    LIMIT ${limit}
-  `);
+  try {
+    const [rows]: any = await db.execute(sql`
+      SELECT
+        id,
+        sessionToken,
+        NULLIF(funnelToken, '') AS funnelToken,
+        NULLIF(visitorId, '') AS visitorId,
+        COALESCE(NULLIF(utmSource, ''), 'Direct / inconnu') AS utmSource,
+        COALESCE(NULLIF(utmMedium, ''), '—') AS utmMedium,
+        COALESCE(NULLIF(utmCampaign, ''), '—') AS utmCampaign,
+        COALESCE(NULLIF(utmContent, ''), '—') AS utmContent,
+        COALESCE(NULLIF(utmTerm, ''), '—') AS utmTerm,
+        NULLIF(fbclid, '') AS fbclid,
+        NULLIF(fbp, '') AS fbp,
+        NULLIF(ipAddress, '') AS ipAddress,
+        NULLIF(userAgent, '') AS userAgent,
+        NULLIF(referrer, '') AS referrer,
+        NULLIF(landingPage, '') AS landingPage,
+        clickedTelegramLink,
+        clickedAt,
+        createdAt
+      FROM utm_sessions
+      ORDER BY createdAt DESC
+      LIMIT ${limit}
+    `);
+    sessionRows = rows;
+  } catch (error) {
+    logDebugLogQueryFailure("sessions", error);
+  }
 
-  const [subscribeRows]: any = await db.execute(sql`
-    SELECT
-      tj.id,
-      tj.telegramUserId,
-      tj.telegramUsername,
-      tj.telegramFirstName,
-      COALESCE(mel.status, tj.metaEventSent, 'pending') AS metaSubscribeStatus,
-      tj.metaEventId AS metaSubscribeEventId,
-      COALESCE(mel.completedAt, tj.metaEventSentAt) AS metaSubscribeSentAt,
-      bs.startedAt,
-      bs.joinedAt,
-      COALESCE(NULLIF(tj.utmSource, ''), NULLIF(bs.utmSource, ''), 'Direct / inconnu') AS utmSource,
-      COALESCE(NULLIF(tj.utmCampaign, ''), NULLIF(bs.utmCampaign, ''), 'Direct / inconnu') AS utmCampaign,
-      COALESCE(NULLIF(tj.utmMedium, ''), NULLIF(bs.utmMedium, ''), '—') AS utmMedium,
-      NULLIF(COALESCE(tj.sessionToken, bs.sessionToken), '') AS sessionToken,
-      NULLIF(COALESCE(tj.funnelToken, bs.funnelToken), '') AS funnelToken,
-      NULLIF(tj.attributionStatus, '') AS attributionStatus,
-      NULLIF(COALESCE(tj.fbclid, bs.fbclid), '') AS fbclid,
-      NULLIF(COALESCE(tj.fbp, bs.fbp), '') AS fbp,
-      NULLIF(COALESCE(tj.ipAddress, bs.ipAddress), '') AS ipAddress,
-      NULLIF(COALESCE(tj.userAgent, bs.userAgent), '') AS userAgent,
-      us.createdAt AS sessionCreatedAt,
-      mel.errorMessage,
-      mel.httpStatus,
-      mel.attemptCount,
-      mel.retryable
-    FROM telegram_joins tj
-    LEFT JOIN bot_starts bs ON bs.telegramUserId = tj.telegramUserId
-    LEFT JOIN utm_sessions us ON us.sessionToken = COALESCE(tj.sessionToken, bs.sessionToken)
-    LEFT JOIN meta_event_logs mel ON mel.eventId = tj.metaEventId
-    ORDER BY tj.joinedAt DESC
-    LIMIT ${limit}
-  `);
+  try {
+    const [rows]: any = await db.execute(sql`
+      SELECT
+        tj.id,
+        tj.telegramUserId,
+        tj.telegramUsername,
+        tj.telegramFirstName,
+        tj.channelTitle,
+        COALESCE(mel.status, tj.metaEventSent, 'pending') AS metaEventSent,
+        tj.metaEventId,
+        COALESCE(mel.completedAt, tj.metaEventSentAt) AS metaEventSentAt,
+        COALESCE(NULLIF(tj.utmSource, ''), 'Direct / inconnu') AS utmSource,
+        COALESCE(NULLIF(tj.utmMedium, ''), '—') AS utmMedium,
+        COALESCE(NULLIF(tj.utmCampaign, ''), '—') AS utmCampaign,
+        NULLIF(tj.sessionToken, '') AS sessionToken,
+        NULLIF(tj.funnelToken, '') AS funnelToken,
+        NULLIF(tj.attributionStatus, '') AS attributionStatus,
+        NULLIF(tj.fbclid, '') AS fbclid,
+        NULLIF(tj.ipAddress, '') AS ipAddress,
+        NULLIF(tj.userAgent, '') AS userAgent,
+        tj.joinedAt,
+        tj.createdAt,
+        mel.errorMessage,
+        mel.httpStatus,
+        mel.attemptCount,
+        mel.retryable
+      FROM telegram_joins tj
+      LEFT JOIN meta_event_logs mel ON mel.eventId = tj.metaEventId
+      ORDER BY tj.joinedAt DESC
+      LIMIT ${limit}
+    `);
+    joinRows = rows;
+  } catch (error) {
+    logDebugLogQueryFailure("joins", error);
+  }
+
+  // Subscribes section: rewritten to NOT put a COALESCE inside a JOIN
+  // condition. Some MySQL configurations refuse to optimize that and
+  // return a generic error. The new path joins utm_sessions twice (once
+  // for tj.sessionToken, once as a fallback for bs.sessionToken) and uses
+  // COALESCE only on the SELECT side — semantically equivalent but
+  // unambiguous to the planner.
+  try {
+    const [rows]: any = await db.execute(sql`
+      SELECT
+        tj.id,
+        tj.telegramUserId,
+        tj.telegramUsername,
+        tj.telegramFirstName,
+        COALESCE(mel.status, tj.metaEventSent, 'pending') AS metaSubscribeStatus,
+        tj.metaEventId AS metaSubscribeEventId,
+        COALESCE(mel.completedAt, tj.metaEventSentAt) AS metaSubscribeSentAt,
+        bs.startedAt,
+        bs.joinedAt,
+        COALESCE(NULLIF(tj.utmSource, ''), NULLIF(bs.utmSource, ''), 'Direct / inconnu') AS utmSource,
+        COALESCE(NULLIF(tj.utmCampaign, ''), NULLIF(bs.utmCampaign, ''), 'Direct / inconnu') AS utmCampaign,
+        COALESCE(NULLIF(tj.utmMedium, ''), NULLIF(bs.utmMedium, ''), '—') AS utmMedium,
+        NULLIF(COALESCE(tj.sessionToken, bs.sessionToken), '') AS sessionToken,
+        NULLIF(COALESCE(tj.funnelToken, bs.funnelToken), '') AS funnelToken,
+        NULLIF(tj.attributionStatus, '') AS attributionStatus,
+        NULLIF(COALESCE(tj.fbclid, bs.fbclid), '') AS fbclid,
+        NULLIF(COALESCE(tj.fbp, bs.fbp), '') AS fbp,
+        NULLIF(COALESCE(tj.ipAddress, bs.ipAddress), '') AS ipAddress,
+        NULLIF(COALESCE(tj.userAgent, bs.userAgent), '') AS userAgent,
+        COALESCE(us_tj.createdAt, us_bs.createdAt) AS sessionCreatedAt,
+        mel.errorMessage,
+        mel.httpStatus,
+        mel.attemptCount,
+        mel.retryable
+      FROM telegram_joins tj
+      LEFT JOIN bot_starts bs ON bs.telegramUserId = tj.telegramUserId
+      LEFT JOIN utm_sessions us_tj ON us_tj.sessionToken = tj.sessionToken
+      LEFT JOIN utm_sessions us_bs ON us_bs.sessionToken = bs.sessionToken
+      LEFT JOIN meta_event_logs mel ON mel.eventId = tj.metaEventId
+      ORDER BY tj.joinedAt DESC
+      LIMIT ${limit}
+    `);
+    subscribeRows = rows;
+  } catch (error) {
+    logDebugLogQueryFailure("subscribes", error);
+  }
 
   return {
     pageviews: pageviewRows,
