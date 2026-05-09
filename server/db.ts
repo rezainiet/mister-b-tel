@@ -1150,6 +1150,37 @@ export async function getBotStartStats() {
   };
 }
 
+/**
+ * Public-facing recent bot-start count for the landing's trust strip.
+ *
+ * Returns BOTH a 7-day count and a 30-day count so the frontend can pick
+ * whichever window reads as most meaningful (small numbers in 7 days look
+ * weak; 30 days gives a steadier signal). Counts are based on
+ * `firstStartedAt` so repeat /start commands by the same user don't
+ * inflate the number — we only count distinct first-time conversions.
+ *
+ * Returns zeros on any DB failure rather than throwing; the landing must
+ * keep rendering even when the count is unavailable.
+ */
+export async function getPublicBotStartCounts(): Promise<{ count7d: number; count30d: number }> {
+  try {
+    const db = await getDb();
+    if (!db) return { count7d: 0, count30d: 0 };
+    const [rows]: any = await db.execute(sql`
+      SELECT
+        COALESCE(SUM(CASE WHEN firstStartedAt >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 ELSE 0 END), 0) AS count7d,
+        COALESCE(SUM(CASE WHEN firstStartedAt >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 ELSE 0 END), 0) AS count30d
+      FROM bot_starts
+    `);
+    return {
+      count7d: Number(rows?.[0]?.count7d || 0),
+      count30d: Number(rows?.[0]?.count30d || 0),
+    };
+  } catch {
+    return { count7d: 0, count30d: 0 };
+  }
+}
+
 export async function getBotStartsByCampaign() {
   const db = await getDb();
   if (!db) return [];

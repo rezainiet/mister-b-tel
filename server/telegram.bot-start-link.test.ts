@@ -12,12 +12,15 @@ describe("telegram bot start link regression", () => {
   });
 
   it("keeps a direct Telegram link on the anchor while intercepting the click long enough to attach the tracked start payload", () => {
-    expect(homeSource).toContain('href={telegramGroupHref}');
-    expect(homeSource).toContain('useState<string>(getTelegramGroupHref())');
-    expect(homeSource).toContain('setTelegramGroupHref(getTelegramGroupHref(session))');
-    expect(homeSource).toContain('openInSameTab');
-    expect(homeSource).toContain('event.preventDefault()');
-    expect(homeSource).toContain('const session = await trackTelegramGroupClick("telegram_group_cta")');
-    expect(homeSource).toContain('window.location.assign(targetHref)');
+    // After the redesign these checks verify INTENT, not the exact helper
+    // names: the CTA href is bound to a state value, the click handler
+    // intercepts to mark the tracked click, then navigates same-tab.
+    expect(homeSource).toContain("href={telegramGroupHref}");
+    expect(homeSource).toContain("event.preventDefault()");
+    expect(homeSource).toContain('trackTelegramGroupClick("telegram_group_cta")');
+    expect(homeSource).toContain("window.location.assign");
+    // Same-tab navigation is what allows the bot deep-link to take over the
+    // current view on mobile rather than opening a stranded blank tab.
+    expect(homeSource).toContain('target="_self"');
   });
 });

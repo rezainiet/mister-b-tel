@@ -23,6 +23,7 @@ import {
   getJoinStats,
   getJoinsByCampaign,
   getLiveStatsSinceMidnight,
+  getPublicBotStartCounts,
   getMetaEventSummary,
   getRecentBotStartsWithMetaStatus,
   getRecentMetaActivityWindow,
@@ -144,6 +145,19 @@ export const appRouter = router({
     }),
   }),
   tracking: router({
+    /**
+     * Public, no-auth, no-input: returns recent first-time bot-start counts
+     * so the landing's trust strip can show a real number instead of a
+     * fabricated one. Cached at the Express layer is unnecessary because the
+     * underlying SUM-CASE is a single scan over a small table.
+     */
+    publicStats: publicProcedure.query(async () => {
+      const counts = await getPublicBotStartCounts();
+      return {
+        recentBotStarts7d: counts.count7d,
+        recentBotStarts30d: counts.count30d,
+      } as const;
+    }),
     createSession: publicProcedure
       .input(
         z.object({

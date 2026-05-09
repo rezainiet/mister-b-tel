@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { trpc } from "@/lib/trpc";
 import {
   TELEGRAM_BOT_DEEP_LINK,
   TELEGRAM_BOT_URL,
@@ -20,67 +21,135 @@ function readPersistedFunnelToken(): string {
   }
 }
 
-const telegramUrl = "https://t.me/MisterBNMB";
+const directContactUrl = "https://t.me/MisterBNMB";
 const logoUrl =
   "https://d2xsxph8kpxj0f.cloudfront.net/310519663482010907/nmN5FRo8qmaVANQi8aWFsw/misterb-logo_21161f1e.jpeg";
 
-// NOTE: This is intentional demo / social-proof content, not real-time data.
-// Names and actions are illustrative — the rotation only animates the toast,
-// it does not reflect live joins. If you need real activity here, wire it to
-// the dashboard.subscriberLog tRPC query instead.
-const socialNotifications = [
-  { id: "lucas-group", name: "Lucas", detail: "a rejoint le groupe privé" },
-  { id: "mehdi-tg", name: "Mehdi", detail: "vient de cliquer sur Telegram" },
-  { id: "sofia-msg", name: "Sofia", detail: "vient d’écrire à Mister B" },
-  { id: "antoine-group", name: "Antoine", detail: "a rejoint le groupe" },
-  { id: "yasmine-news", name: "Yasmine", detail: "vient de demander les nouveautés" },
-  { id: "marco-tg", name: "Marco", detail: "vient de cliquer sur Telegram" },
-  { id: "karim-group", name: "Karim", detail: "a rejoint le groupe privé" },
-  { id: "lea-tg", name: "Léa", detail: "vient de cliquer sur Telegram" },
-  { id: "amine-msg", name: "Amine", detail: "vient d’écrire à Mister B" },
-  { id: "giulia-vip", name: "Giulia", detail: "vient de rejoindre la liste VIP" },
-  { id: "nora-group", name: "Nora", detail: "a rejoint le groupe" },
-  { id: "samir-tg", name: "Samir", detail: "vient de cliquer sur Telegram" },
-];
+// Trust-strip threshold: below this, we hide the live count rather than show
+// a number that reads weak. Counts above this render verbatim — no inflation.
+const PUBLIC_COUNT_DISPLAY_FLOOR = 80;
 
-type SocialNotification = (typeof socialNotifications)[number];
+// Placeholder testimonials. These are LABELED as illustrative below the page
+// — replace with real, consented quotes before running paid traffic. Keeping
+// them in the source so the layout always renders; the disclaimer below the
+// section makes the legal posture clear.
+const PLACEHOLDER_TESTIMONIALS = [
+  {
+    id: "karim-lyon",
+    name: "Karim",
+    city: "Lyon",
+    quote: "Très réactif, j'ai eu accès à tout en moins d'une minute.",
+  },
+  {
+    id: "sofia-paris",
+    name: "Sofia",
+    city: "Paris",
+    quote: "Le canal vaut clairement le détour, contenu exclusif tous les jours.",
+  },
+  {
+    id: "yacine-marseille",
+    name: "Yacine",
+    city: "Marseille",
+    quote: "J'ai jamais vu un service aussi propre et direct, je recommande.",
+  },
+] as const;
 
-function shuffleNotifications(list: SocialNotification[]) {
-  const copied = [...list];
+const VALUE_BULLETS = [
+  {
+    id: "exclusivites",
+    icon: "★",
+    title: "Plans privés en avant-première",
+    body: "Tu reçois en premier les infos partagées en interne — avant tout le monde.",
+  },
+  {
+    id: "direct",
+    icon: "✉",
+    title: "Échange direct avec Mister",
+    body: "Une question ou un besoin précis ? Tu peux écrire directement, sans intermédiaire.",
+  },
+  {
+    id: "selectif",
+    icon: "✓",
+    title: "Accès sélectif",
+    body: "Le canal est privé et limité — tu rejoins une communauté réelle, pas une mailing-list.",
+  },
+] as const;
 
-  for (let index = copied.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1));
-    [copied[index], copied[randomIndex]] = [copied[randomIndex], copied[index]];
-  }
+const FAQ_ITEMS = [
+  {
+    id: "free",
+    q: "C'est gratuit ?",
+    a: "Oui, l'accès au canal privé est offert. Aucune carte demandée, aucun engagement.",
+  },
+  {
+    id: "delay",
+    q: "Combien de temps avant d'avoir accès ?",
+    a: "Immédiat. Tu cliques, tu valides sur Telegram, le bot t'envoie le lien WhatsApp dans la seconde.",
+  },
+  {
+    id: "what",
+    q: "Qu'est-ce que je reçois exactement ?",
+    a: "Un accès au canal WhatsApp privé Mister B et la possibilité d'écrire directement.",
+  },
+  {
+    id: "leave",
+    q: "Je peux me désabonner ?",
+    a: "Oui, à tout moment. Tu quittes le canal WhatsApp en un clic, sans justification.",
+  },
+  {
+    id: "why-wa",
+    q: "Pourquoi WhatsApp et pas autre chose ?",
+    a: "C'est la messagerie la plus fluide pour rester en contact direct. Le bot Telegram sert juste à valider l'accès et à filtrer les bots.",
+  },
+] as const;
 
-  return copied;
+type FaqItem = (typeof FAQ_ITEMS)[number];
+
+function useTelegramGroupHref() {
+  const [href, setHref] = useState<string>(() => getInitialTelegramGroupHref());
+
+  useEffect(() => {
+    void initAdvancedTracking().then((session) => {
+      setHref(buildHrefFromSession(session));
+    });
+  }, []);
+
+  const updateFromSession = (session: TrackingSession | null) => {
+    setHref(buildHrefFromSession(session));
+  };
+
+  return [href, updateFromSession] as const;
 }
 
-function buildVisitSequence() {
-  if (typeof window === "undefined") {
-    return socialNotifications;
-  }
-
-  const shuffled = shuffleNotifications(socialNotifications);
-  const lastFirstToastId = window.localStorage.getItem("misterb-last-toast-id");
-
-  if (shuffled.length > 1 && shuffled[0].id === lastFirstToastId) {
-    const firstItem = shuffled.shift();
-    if (firstItem) {
-      shuffled.push(firstItem);
-    }
-  }
-
-  window.localStorage.setItem("misterb-last-toast-id", shuffled[0].id);
-  return shuffled;
+function shouldPreferTelegramDeepLink() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-function WhatsAppIcon() {
+function buildHrefFromSession(session: TrackingSession | null): string {
+  const preferDeepLink = shouldPreferTelegramDeepLink();
+  if (session) return preferDeepLink ? session.telegramDeepLink : session.telegramBotUrl;
+  return getInitialTelegramGroupHref();
+}
+
+function getInitialTelegramGroupHref(): string {
+  const preferDeepLink = shouldPreferTelegramDeepLink();
+  const funnelToken = readPersistedFunnelToken();
+  if (funnelToken) {
+    const fallback = buildFallbackTrackingSession(funnelToken);
+    return preferDeepLink ? fallback.telegramDeepLink : fallback.telegramBotUrl;
+  }
+  return preferDeepLink ? TELEGRAM_BOT_DEEP_LINK : TELEGRAM_BOT_URL;
+}
+
+function WhatsAppIcon({ size = 28 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 32 32"
-      className="h-7.5 w-7.5 rounded-full bg-white shadow-[0_4px_12px_rgba(0,0,0,0.10)]"
+      width={size}
+      height={size}
+      className="rounded-full bg-white shadow-[0_4px_12px_rgba(0,0,0,0.10)]"
     >
       <circle cx="16" cy="16" r="15" fill="#25D366" />
       <path
@@ -91,12 +160,14 @@ function WhatsAppIcon() {
   );
 }
 
-function TelegramIcon() {
+function TelegramIcon({ size = 28 }: { size?: number }) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 32 32"
-      className="h-7.5 w-7.5 rounded-full bg-white shadow-[0_4px_12px_rgba(0,0,0,0.10)]"
+      width={size}
+      height={size}
+      className="rounded-full bg-white shadow-[0_4px_12px_rgba(0,0,0,0.10)]"
     >
       <circle cx="16" cy="16" r="15" fill="#2AABEE" />
       <path
@@ -107,243 +178,254 @@ function TelegramIcon() {
   );
 }
 
-type CtaButtonProps = {
+type PrimaryCtaProps = {
   href: string;
-  label: string;
-  icon: "whatsapp" | "telegram";
-  animationDelay: string;
   onTrack: (event: React.MouseEvent<HTMLAnchorElement>) => void | Promise<void>;
-  openInSameTab?: boolean;
-  disabled?: boolean;
+  size?: "hero" | "sticky";
 };
 
-function CtaButton({ href, label, icon, animationDelay, onTrack, openInSameTab = false, disabled = false }: CtaButtonProps) {
+function PrimaryCta({ href, onTrack, size = "hero" }: PrimaryCtaProps) {
   const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    if (disabled) {
-      event.preventDefault();
-      return;
-    }
     void onTrack(event);
   };
+
+  const sizeClasses =
+    size === "hero"
+      ? "min-h-[68px] text-[1rem] px-5 py-3"
+      : "min-h-[58px] text-[0.95rem] px-4 py-2.5";
 
   return (
     <a
       href={href}
-      target={openInSameTab ? "_self" : "_blank"}
-      rel={openInSameTab ? undefined : "noreferrer"}
-      data-direct-open={openInSameTab ? "telegram-bot" : undefined}
-      aria-disabled={disabled ? "true" : undefined}
+      target="_self"
+      data-direct-open="telegram-bot"
       onClick={handleClick}
-      style={{ animation: disabled ? undefined : `ctaFloat 2.8s ease-in-out ${animationDelay} infinite` }}
-      className={`flex min-h-[66px] w-full items-center justify-center gap-3 rounded-[21px] bg-white px-4.5 py-3 text-[0.9rem] font-[650] uppercase tracking-[-0.02em] text-black shadow-[0_9px_20px_rgba(145,255,127,0.22)] transition-transform duration-150 ${disabled ? "cursor-wait opacity-80" : "hover:-translate-y-1 hover:shadow-[0_11px_24px_rgba(145,255,127,0.28)] active:translate-y-0"}`}
+      className={`flex w-full items-center justify-center gap-3 rounded-[20px] bg-white font-[660] uppercase tracking-[-0.02em] text-black shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition-transform duration-150 hover:-translate-y-1 hover:shadow-[0_14px_30px_rgba(0,0,0,0.22)] active:translate-y-0 ${sizeClasses}`}
     >
-      <span
-        className="shrink-0"
-        style={{ animation: `ctaIconPulse 2.8s ease-in-out ${animationDelay} infinite` }}
-      >
-        {icon === "whatsapp" ? <WhatsAppIcon /> : <TelegramIcon />}
-      </span>
-      <span>{label}</span>
+      <WhatsAppIcon size={size === "hero" ? 28 : 24} />
+      <span>Rejoindre le groupe privé</span>
     </a>
   );
 }
 
-function shouldPreferTelegramDeepLink() {
-  if (typeof navigator === "undefined") return false;
-  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+function FaqRow({ item }: { item: FaqItem }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="border-b border-black/15 last:border-b-0">
+      <button
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between gap-4 py-3 text-left"
+        aria-expanded={open}
+      >
+        <span className="text-[0.95rem] font-[600] tracking-[-0.015em] text-black">
+          {item.q}
+        </span>
+        <span
+          aria-hidden="true"
+          className={`shrink-0 text-[1.1rem] font-[700] text-black/55 transition-transform ${open ? "rotate-45" : ""}`}
+        >
+          +
+        </span>
+      </button>
+      {open ? (
+        <p className="pb-3 text-[0.88rem] leading-[1.45] text-black/72">{item.a}</p>
+      ) : null}
+    </div>
+  );
 }
 
-function getTelegramGroupHref(session?: TrackingSession | null) {
-  const preferDeepLink = shouldPreferTelegramDeepLink();
+function TrustStrip() {
+  // This component is the ONLY caller of the tRPC hook on the page so it
+  // can be safely gated behind the client-mount check below — the hook
+  // never runs during SSR/test renders (no Provider in those environments).
+  const publicStatsQuery = trpc.tracking.publicStats.useQuery(undefined, {
+    staleTime: 60_000, // Trust strip doesn't need to be second-accurate.
+    refetchOnWindowFocus: false,
+  });
 
-  if (session) {
-    return preferDeepLink ? session.telegramDeepLink : session.telegramBotUrl;
-  }
+  const trustCount = useMemo(() => {
+    const stats = publicStatsQuery.data;
+    if (!stats) return null;
+    // Prefer 7d when it crosses the floor, else 30d, else hide. Avoids
+    // ever rendering "12 personnes" which reads as low traction.
+    if (stats.recentBotStarts7d >= PUBLIC_COUNT_DISPLAY_FLOOR) {
+      return { value: stats.recentBotStarts7d, window: "7d" as const };
+    }
+    if (stats.recentBotStarts30d >= PUBLIC_COUNT_DISPLAY_FLOOR) {
+      return { value: stats.recentBotStarts30d, window: "30d" as const };
+    }
+    return null;
+  }, [publicStatsQuery.data]);
 
-  // No session yet — build a funnelToken-only fallback link so the href in
-  // the DOM always carries some attribution hint, even before React mount or
-  // if the user taps before the createSession round-trip completes.
-  const funnelToken = readPersistedFunnelToken();
-  if (funnelToken) {
-    const fallback = buildFallbackTrackingSession(funnelToken);
-    return preferDeepLink ? fallback.telegramDeepLink : fallback.telegramBotUrl;
-  }
-
-  return preferDeepLink ? TELEGRAM_BOT_DEEP_LINK : TELEGRAM_BOT_URL;
+  if (!trustCount) return null;
+  return (
+    <p className="mt-5 text-[0.78rem] font-[500] tracking-[-0.005em] text-black/62">
+      {trustCount.value.toLocaleString("fr-FR")} personnes ont rejoint{" "}
+      {trustCount.window === "7d" ? "cette semaine" : "ce mois-ci"}
+    </p>
+  );
 }
 
 export default function Home() {
-  const notifications = useMemo(() => buildVisitSequence(), []);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const [isToastVisible, setIsToastVisible] = useState(false);
-  const [telegramGroupHref, setTelegramGroupHref] = useState<string>(getTelegramGroupHref());
-
+  const [telegramGroupHref, updateTelegramGroupHref] = useTelegramGroupHref();
+  // The trust strip needs a tRPC provider to call its hook. We mount it
+  // client-side only so SSR / test renders skip the hook entirely.
+  const [showTrustStrip, setShowTrustStrip] = useState(false);
   useEffect(() => {
-    void initAdvancedTracking().then((session) => {
-      setTelegramGroupHref(getTelegramGroupHref(session));
-    });
+    setShowTrustStrip(true);
   }, []);
 
-  useEffect(() => {
-    const initialTimeout = window.setTimeout(() => {
-      setIsToastVisible(true);
-    }, 1600);
+  const handlePrimaryClick = async (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    const session = await trackTelegramGroupClick("telegram_group_cta");
+    const href = buildHrefFromSession(session);
+    updateTelegramGroupHref(session);
+    window.location.assign(href);
+  };
 
-    let fadeTimeout: number | undefined;
-
-    const interval = window.setInterval(() => {
-      setIsToastVisible(false);
-
-      fadeTimeout = window.setTimeout(() => {
-        setActiveIndex((currentIndex) => (currentIndex + 1) % notifications.length);
-        setIsToastVisible(true);
-      }, 260);
-    }, 4200);
-
-    return () => {
-      window.clearTimeout(initialTimeout);
-      window.clearInterval(interval);
-      if (fadeTimeout) {
-        window.clearTimeout(fadeTimeout);
-      }
-    };
-  }, [notifications.length]);
-
-  const activeToast = notifications[activeIndex];
+  const handleContactClick = async (event: React.MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault();
+    try {
+      await trackTelegramClick("telegram_contact_cta");
+    } finally {
+      window.location.assign(directContactUrl);
+    }
+  };
 
   return (
-    <main className="relative min-h-[100svh] overflow-hidden bg-[#1BD51C] text-black">
+    <main className="relative min-h-[100svh] bg-[#1BD51C] text-black">
       <style>{`
-        @keyframes ctaFloat {
-          0%, 100% {
-            transform: translateY(0) scale(1);
-            box-shadow: 0 12px 24px rgba(145, 255, 127, 0.26);
-          }
-          50% {
-            transform: translateY(-4px) scale(1.018);
-            box-shadow: 0 18px 34px rgba(145, 255, 127, 0.38);
-          }
-        }
-
-        @keyframes ctaIconPulse {
-          0%, 100% {
-            transform: scale(1);
-          }
-          50% {
-            transform: scale(1.08);
-          }
-        }
-
-        @keyframes toastDrift {
-          0%, 100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-2px);
-          }
+        @keyframes ctaPulse {
+          0%, 100% { transform: translateY(0) scale(1); }
+          50% { transform: translateY(-2px) scale(1.012); }
         }
       `}</style>
 
-      <div className="pointer-events-none absolute inset-0 opacity-90">
-        <div className="absolute left-[-14%] top-[4%] h-40 w-40 rounded-full bg-[#c1ffb9] blur-3xl" />
-        <div className="absolute right-[-10%] top-[16%] h-44 w-44 rounded-full bg-[#cbffc6] blur-3xl" />
-        <div className="absolute left-[0%] top-[50%] h-52 w-52 rounded-full bg-[#c5ffbd] blur-3xl" />
-        <div className="absolute right-[3%] bottom-[14%] h-56 w-56 rounded-full bg-[#c8ffc1] blur-3xl" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[420px] opacity-90">
+        <div className="absolute left-[-12%] top-[6%] h-44 w-44 rounded-full bg-[#c1ffb9] blur-3xl" />
+        <div className="absolute right-[-8%] top-[18%] h-44 w-44 rounded-full bg-[#cbffc6] blur-3xl" />
       </div>
 
-      <div className="pointer-events-none absolute right-3 top-3 z-20 sm:right-4 sm:top-4">
-        <div
-          aria-live="polite"
-          className={`max-w-[150px] rounded-[15px] border border-white/45 bg-white/68 px-2.5 py-1.5 text-left shadow-[0_7px_16px_rgba(15,45,23,0.08)] backdrop-blur-sm transition-all duration-300 ${
-            isToastVisible ? "translate-y-0 opacity-100" : "translate-y-1.5 opacity-0"
-          }`}
-          style={{ animation: "toastDrift 4.2s ease-in-out infinite" }}
+      {/* HERO */}
+      <section className="relative mx-auto flex w-full max-w-[420px] flex-col items-center px-5 pt-8 pb-10 text-center">
+        <div className="rounded-full bg-white p-[5px] shadow-[0_8px_22px_rgba(124,255,113,0.32)]">
+          <img
+            src={logoUrl}
+            alt="Logo Mister B"
+            className="h-[110px] w-[110px] rounded-full object-cover"
+          />
+        </div>
+
+        <h1 className="mt-4 text-[2.5rem] font-[700] tracking-[-0.05em] text-black">Mister B</h1>
+
+        <p className="mt-3 max-w-[330px] text-[1.45rem] font-[620] leading-[1.1] tracking-[-0.035em] text-black">
+          Le canal privé n°1 en France pour rester en contact direct.
+        </p>
+
+        <p className="mt-3 max-w-[320px] text-[0.92rem] font-[440] leading-[1.35] tracking-[-0.015em] text-black/78">
+          Accès gratuit au canal WhatsApp privé. Tu valides sur Telegram, le bot t'envoie le lien dans la seconde.
+        </p>
+
+        <div className="mt-5 w-full" style={{ animation: "ctaPulse 2.8s ease-in-out infinite" }}>
+          <PrimaryCta href={telegramGroupHref} onTrack={handlePrimaryClick} size="hero" />
+        </div>
+
+        <a
+          href={directContactUrl}
+          target="_self"
+          onClick={handleContactClick}
+          className="mt-4 inline-flex items-center gap-2 text-[0.85rem] font-[540] tracking-[-0.01em] text-black/68 hover:text-black"
         >
-          <div className="flex items-start gap-2">
-            <div className="mt-[2px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#42c85e] shadow-[0_0_0_3px_rgba(66,200,94,0.12)]" />
-            <div className="min-w-0">
-              <p className="text-[0.64rem] font-[640] leading-none tracking-[-0.015em] text-[#244428]">
-                {activeToast.name}
-              </p>
-              <p className="mt-0.5 text-[0.62rem] font-[430] leading-[1.18] tracking-[-0.01em] text-black/58">
-                {activeToast.detail}
-              </p>
-            </div>
-          </div>
+          <TelegramIcon size={20} />
+          <span>Me contacter directement</span>
+        </a>
+
+        {showTrustStrip ? <TrustStrip /> : null}
+      </section>
+
+      {/* CE QUE TU REÇOIS */}
+      <section className="relative mx-auto w-full max-w-[420px] px-5 pb-8">
+        <div className="rounded-[24px] border border-black/12 bg-white/65 p-5 backdrop-blur-sm">
+          <h2 className="text-[0.78rem] font-[640] uppercase tracking-[0.16em] text-black/58">
+            Ce que tu reçois
+          </h2>
+          <ul className="mt-3 space-y-3">
+            {VALUE_BULLETS.map((bullet) => (
+              <li key={bullet.id} className="flex gap-3">
+                <span
+                  aria-hidden="true"
+                  className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-[0.8rem] font-[700] text-[#1BD51C]"
+                >
+                  {bullet.icon}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[0.95rem] font-[640] leading-[1.2] tracking-[-0.015em] text-black">
+                    {bullet.title}
+                  </p>
+                  <p className="mt-1 text-[0.85rem] leading-[1.4] tracking-[-0.005em] text-black/72">
+                    {bullet.body}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-      </div>
+      </section>
 
-      <section
-        id="hero-section"
-        className="relative mx-auto flex min-h-[100svh] w-full max-w-[374px] flex-col items-center justify-center px-4.5 py-2 text-center"
-      >
-        <div className="w-full">
-          <div className="flex justify-center">
-            <div className="rounded-full bg-white p-[5px] shadow-[0_8px_18px_rgba(124,255,113,0.28)]">
-              <img
-                src={logoUrl}
-                alt="Logo Mister B"
-                className="h-[120px] w-[120px] rounded-full object-cover shadow-[0_0_18px_rgba(243,255,126,0.26)]"
-              />
-            </div>
-          </div>
-
-          <h1 className="mt-3.5 text-[2.55rem] font-[700] tracking-[-0.05em] text-black">Mister B</h1>
-
-          <div id="hero-copy" className="mx-auto mt-3.5 max-w-[302px]">
-            <p className="text-[1.68rem] font-[620] leading-[1.1] tracking-[-0.038em] text-black">
-              Vendeur numéro 1 en France aujourd&apos;hui jamais égalé <span aria-hidden="true">🇫🇷</span>
-            </p>
-          </div>
-
-          <p className="mx-auto mt-3.5 max-w-[314px] text-[0.94rem] font-[430] leading-[1.22] tracking-[-0.02em] text-black/82">
-            Clique pour rejoindre le groupe privé <span aria-hidden="true">✅</span>
-          </p>
+      {/* TESTIMONIALS */}
+      <section className="relative mx-auto w-full max-w-[420px] px-5 pb-8">
+        <h2 className="text-[0.78rem] font-[640] uppercase tracking-[0.16em] text-black/58">
+          Ils en parlent
+        </h2>
+        <div className="mt-3 space-y-3">
+          {PLACEHOLDER_TESTIMONIALS.map((testimonial) => (
+            <figure
+              key={testimonial.id}
+              className="rounded-[20px] border border-black/12 bg-white/72 p-4 backdrop-blur-sm"
+            >
+              <blockquote className="text-[0.92rem] font-[480] leading-[1.4] tracking-[-0.01em] text-black">
+                « {testimonial.quote} »
+              </blockquote>
+              <figcaption className="mt-2 text-[0.75rem] font-[540] tracking-[0.01em] text-black/58">
+                {testimonial.name}, {testimonial.city}
+              </figcaption>
+            </figure>
+          ))}
         </div>
+        <p className="mt-2 text-[0.66rem] leading-[1.35] tracking-[0.005em] text-black/45">
+          Témoignages illustratifs présentés à titre d'exemple.
+        </p>
+      </section>
 
-        <div id="cta-group" className="mt-4.5 w-full space-y-3">
-          <CtaButton
-            href={telegramGroupHref}
-            label="Groupe Telegram"
-            icon="telegram"
-            animationDelay="0s"
-            openInSameTab
-            onTrack={async (event) => {
-              event.preventDefault();
-              const session = await trackTelegramGroupClick("telegram_group_cta");
-              // trackTelegramGroupClick is guaranteed to return a session whose
-              // telegramBotUrl already contains a non-empty `?start=` payload
-              // (real session OR funnelToken-only fallback). Trust that — never
-              // fall back to a payload-less bot URL here.
-              const targetHref = getTelegramGroupHref(session);
-              setTelegramGroupHref(targetHref);
-              window.location.assign(targetHref);
-            }}
-          />
-          <CtaButton
-            href={telegramUrl}
-            label="Me contacter"
-            icon="telegram"
-            animationDelay="0.45s"
-            openInSameTab
-            onTrack={async (event) => {
-              event.preventDefault();
-              try {
-                await trackTelegramClick("telegram_contact_cta");
-              } finally {
-                window.location.assign(telegramUrl);
-              }
-            }}
-          />
+      {/* FAQ */}
+      <section className="relative mx-auto w-full max-w-[420px] px-5 pb-32">
+        <h2 className="text-[0.78rem] font-[640] uppercase tracking-[0.16em] text-black/58">
+          FAQ
+        </h2>
+        <div className="mt-3 rounded-[20px] border border-black/12 bg-white/72 px-4 backdrop-blur-sm">
+          {FAQ_ITEMS.map((item) => (
+            <FaqRow key={item.id} item={item} />
+          ))}
         </div>
 
-        <div className="mt-4.5 flex flex-col items-center gap-1">
-          <p className="text-[0.76rem] font-normal tracking-[-0.01em] text-black/36">Join Mister B</p>
-          <a href="/dashboard" className="text-[0.64rem] font-medium tracking-[0.14em] uppercase text-black/30 transition hover:text-black/50">
+        <div className="mt-6 flex flex-col items-center gap-1">
+          <p className="text-[0.74rem] font-normal tracking-[-0.005em] text-black/35">Join Mister B</p>
+          <a
+            href="/dashboard"
+            className="text-[0.62rem] font-medium uppercase tracking-[0.14em] text-black/30 transition hover:text-black/55"
+          >
             Accès suivi privé
           </a>
         </div>
       </section>
+
+      {/* STICKY MOBILE CTA */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/10 bg-[#1BD51C]/92 px-4 pb-[max(env(safe-area-inset-bottom,12px),12px)] pt-3 backdrop-blur-md">
+        <div className="mx-auto w-full max-w-[420px]">
+          <PrimaryCta href={telegramGroupHref} onTrack={handlePrimaryClick} size="sticky" />
+        </div>
+      </div>
     </main>
   );
 }

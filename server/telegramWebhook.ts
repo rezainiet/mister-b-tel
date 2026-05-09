@@ -101,7 +101,7 @@ export function buildDefaultWelcomeMessage(
   return [
     greeting,
     "Ici, tu vas pouvoir accéder aux nouveautés, aux infos réservées et au contenu privé.",
-    `Rejoins maintenant le canal privé ici → ${groupUrl}`,
+    `Rejoins maintenant le canal WhatsApp privé ici → ${groupUrl}`,
     "",
     `Et si tu veux échanger directement avec moi, tu peux aussi me contacter ici : ${TELEGRAM_DIRECT_CONTACT}`,
   ].join("\n");
