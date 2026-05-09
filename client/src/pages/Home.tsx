@@ -210,26 +210,39 @@ function PrimaryCta({ href, onTrack, size = "hero" }: PrimaryCtaProps) {
 function FaqRow({ item }: { item: FaqItem }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="border-b border-black/15 last:border-b-0">
+    <div className="border-b border-black/12 last:border-b-0">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex w-full items-center justify-between gap-4 py-3 text-left"
+        className="group flex w-full items-center justify-between gap-4 py-4 text-left md:py-5"
         aria-expanded={open}
       >
-        <span className="text-[0.95rem] font-[600] tracking-[-0.015em] text-black">
+        <span className="text-[0.98rem] font-[600] tracking-[-0.015em] text-black md:text-[1.05rem]">
           {item.q}
         </span>
-        <span
+        {/* Smooth chevron: rotates 180° on open. SVG keeps it crisp at any size. */}
+        <svg
           aria-hidden="true"
-          className={`shrink-0 text-[1.1rem] font-[700] text-black/55 transition-transform ${open ? "rotate-45" : ""}`}
+          viewBox="0 0 24 24"
+          width="18"
+          height="18"
+          className={`shrink-0 text-black/55 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          +
-        </span>
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </button>
-      {open ? (
-        <p className="pb-3 text-[0.88rem] leading-[1.45] text-black/72">{item.a}</p>
-      ) : null}
+      <div
+        className={`grid overflow-hidden transition-all duration-250 ease-out ${open ? "grid-rows-[1fr] pb-4 md:pb-5" : "grid-rows-[0fr]"}`}
+      >
+        <p className="min-h-0 pr-6 text-[0.92rem] leading-[1.5] text-black/72 md:text-[0.98rem] md:leading-[1.55]">
+          {item.a}
+        </p>
+      </div>
     </div>
   );
 }
@@ -293,7 +306,7 @@ export default function Home() {
   };
 
   return (
-    <main className="relative min-h-[100svh] bg-[#1BD51C] text-black">
+    <main className="relative min-h-[100svh] bg-[#1BD51C] text-black antialiased">
       <style>{`
         @keyframes ctaPulse {
           0%, 100% { transform: translateY(0) scale(1); }
@@ -301,68 +314,121 @@ export default function Home() {
         }
       `}</style>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[420px] opacity-90">
-        <div className="absolute left-[-12%] top-[6%] h-44 w-44 rounded-full bg-[#c1ffb9] blur-3xl" />
-        <div className="absolute right-[-8%] top-[18%] h-44 w-44 rounded-full bg-[#cbffc6] blur-3xl" />
-      </div>
-
-      {/* HERO */}
-      <section className="relative mx-auto flex w-full max-w-[420px] flex-col items-center px-5 pt-8 pb-10 text-center">
-        <div className="rounded-full bg-white p-[5px] shadow-[0_8px_22px_rgba(124,255,113,0.32)]">
-          <img
-            src={logoUrl}
-            alt="Logo Mister B"
-            className="h-[110px] w-[110px] rounded-full object-cover"
-          />
+      {/* SECTION 1 — HERO. Centered column on mobile, two-column on desktop:
+          left = brand+copy+CTA, right = soft visual / proof block. */}
+      <section className="relative overflow-hidden">
+        {/* Soft hero blobs: visible on mobile too but more dramatic on desktop. */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 opacity-90">
+          <div className="absolute left-[-10%] top-[-6%] h-56 w-56 rounded-full bg-[#c1ffb9] blur-3xl md:h-[28rem] md:w-[28rem]" />
+          <div className="absolute right-[-8%] top-[20%] h-52 w-52 rounded-full bg-[#cbffc6] blur-3xl md:h-[26rem] md:w-[26rem]" />
         </div>
 
-        <h1 className="mt-4 text-[2.5rem] font-[700] tracking-[-0.05em] text-black">Mister B</h1>
+        <div className="relative z-10 mx-auto flex w-full max-w-[1180px] flex-col items-center px-5 pt-10 pb-12 text-center md:grid md:grid-cols-[1.1fr_0.9fr] md:items-center md:gap-14 md:px-10 md:pt-20 md:pb-24 md:text-left lg:gap-20 lg:pt-24 lg:pb-28">
+          {/* Left column on desktop, full-width on mobile */}
+          <div className="flex flex-col items-center md:items-start">
+            <div className="rounded-full bg-white p-[6px] shadow-[0_10px_28px_rgba(124,255,113,0.32)]">
+              <img
+                src={logoUrl}
+                alt="Logo Mister B"
+                className="h-[110px] w-[110px] rounded-full object-cover md:h-[124px] md:w-[124px]"
+              />
+            </div>
 
-        <p className="mt-3 max-w-[330px] text-[1.45rem] font-[620] leading-[1.1] tracking-[-0.035em] text-black">
-          Bienvenue dans l'espace privé.
-        </p>
+            <h1 className="mt-5 text-[2.5rem] font-[720] leading-[0.95] tracking-[-0.055em] text-black md:mt-6 md:text-[3.75rem] lg:text-[4.5rem]">
+              Mister B
+            </h1>
 
-        <p className="mt-3 max-w-[320px] text-[0.92rem] font-[440] leading-[1.35] tracking-[-0.015em] text-black/78">
-          Reçois ce qui ne sort pas en public, directement sur WhatsApp. Accès gratuit, en un clic.
-        </p>
+            <p className="mt-4 max-w-[330px] text-[1.45rem] font-[620] leading-[1.1] tracking-[-0.035em] text-black md:mt-5 md:max-w-[420px] md:text-[1.85rem] md:leading-[1.05] lg:text-[2.1rem]">
+              Bienvenue dans l'espace privé.
+            </p>
 
-        <div className="mt-5 w-full" style={{ animation: "ctaPulse 2.8s ease-in-out infinite" }}>
-          <PrimaryCta href={telegramGroupHref} onTrack={handlePrimaryClick} size="hero" />
+            <p className="mt-3 max-w-[330px] text-[0.95rem] font-[440] leading-[1.4] tracking-[-0.012em] text-black/78 md:mt-4 md:max-w-[460px] md:text-[1.05rem] md:leading-[1.5]">
+              Reçois ce qui ne sort pas en public, directement sur WhatsApp. Accès gratuit, en un clic.
+            </p>
+
+            <div
+              className="mt-6 w-full max-w-[400px] md:mt-8"
+              style={{ animation: "ctaPulse 2.8s ease-in-out infinite" }}
+            >
+              <PrimaryCta href={telegramGroupHref} onTrack={handlePrimaryClick} size="hero" />
+            </div>
+
+            <a
+              href={directContactUrl}
+              target="_self"
+              onClick={handleContactClick}
+              className="mt-4 inline-flex items-center gap-2 text-[0.88rem] font-[540] tracking-[-0.01em] text-black/68 transition-colors hover:text-black md:text-[0.95rem]"
+            >
+              <TelegramIcon size={20} />
+              <span>Me contacter directement</span>
+            </a>
+
+            {showTrustStrip ? <TrustStrip /> : null}
+          </div>
+
+          {/* Right column — desktop-only visual proof block.
+              Hidden on mobile to keep the hero compact and the CTA above the fold. */}
+          <aside className="hidden md:block">
+            <div className="relative mx-auto max-w-[440px]">
+              {/* Floating "live" card mockup — subtle, doesn't compete with the CTA. */}
+              <div className="relative rounded-[28px] border border-black/15 bg-white/90 p-7 shadow-[0_24px_48px_rgba(0,0,0,0.10)]">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-[#1BD51C] ring-4 ring-[#1BD51C]/20" />
+                  <div className="min-w-0">
+                    <p className="text-[0.92rem] font-[640] tracking-[-0.012em] text-black">Mister B · Canal privé</p>
+                    <p className="text-[0.78rem] text-black/55">accès direct WhatsApp</p>
+                  </div>
+                </div>
+                <div className="mt-5 space-y-3">
+                  <div className="rounded-[16px] bg-black/5 px-4 py-3">
+                    <p className="text-[0.72rem] font-[600] uppercase tracking-[0.12em] text-black/45">Aujourd'hui</p>
+                    <p className="mt-1 text-[0.95rem] leading-[1.35] text-black">
+                      Nouveau plan partagé en exclusivité dans le canal.
+                    </p>
+                  </div>
+                  <div className="rounded-[16px] bg-black/5 px-4 py-3">
+                    <p className="text-[0.72rem] font-[600] uppercase tracking-[0.12em] text-black/45">Hier</p>
+                    <p className="mt-1 text-[0.95rem] leading-[1.35] text-black">
+                      Bienvenue à 27 nouveaux membres.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-5 flex items-center gap-2 border-t border-black/10 pt-4">
+                  <div className="h-2 w-2 rounded-full bg-[#1BD51C] shadow-[0_0_0_4px_rgba(27,213,28,0.18)]" />
+                  <p className="text-[0.78rem] text-black/55">Canal actif · réponses sous 24h</p>
+                </div>
+              </div>
+
+              <div className="absolute -right-4 -top-4 h-20 w-20 rounded-full bg-white/40 blur-2xl" />
+              <div className="absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-white/40 blur-2xl" />
+            </div>
+          </aside>
         </div>
-
-        <a
-          href={directContactUrl}
-          target="_self"
-          onClick={handleContactClick}
-          className="mt-4 inline-flex items-center gap-2 text-[0.85rem] font-[540] tracking-[-0.01em] text-black/68 hover:text-black"
-        >
-          <TelegramIcon size={20} />
-          <span>Me contacter directement</span>
-        </a>
-
-        {showTrustStrip ? <TrustStrip /> : null}
       </section>
 
-      {/* CE QUE TU REÇOIS */}
-      <section className="relative mx-auto w-full max-w-[420px] px-5 pb-8">
-        <div className="rounded-[24px] border border-black/12 bg-white/65 p-5 backdrop-blur-sm">
-          <h2 className="text-[0.78rem] font-[640] uppercase tracking-[0.16em] text-black/58">
+      {/* SECTION 2 — CE QUE TU REÇOIS. Single column mobile, 3-up grid desktop. */}
+      <section className="relative">
+        <div className="mx-auto w-full max-w-[1180px] px-5 pb-12 md:px-10 md:pb-20 lg:pb-24">
+          <h2 className="text-[0.78rem] font-[640] uppercase tracking-[0.18em] text-black/58 md:text-center md:text-[0.84rem]">
             Ce que tu reçois
           </h2>
-          <ul className="mt-3 space-y-3">
+          <ul className="mt-4 grid gap-3 md:mt-10 md:grid-cols-3 md:gap-6">
             {VALUE_BULLETS.map((bullet) => (
-              <li key={bullet.id} className="flex gap-3">
+              <li
+                key={bullet.id}
+                className="flex gap-3 rounded-[20px] border border-black/12 bg-white/72 p-4 backdrop-blur-sm md:flex-col md:gap-4 md:rounded-[24px] md:p-7 md:text-left"
+              >
                 <span
                   aria-hidden="true"
-                  className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-[0.8rem] font-[700] text-[#1BD51C]"
+                  className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black text-[0.85rem] font-[700] text-[#1BD51C] md:h-11 md:w-11 md:text-[1.05rem]"
                 >
                   {bullet.icon}
                 </span>
                 <div className="min-w-0">
-                  <p className="text-[0.95rem] font-[640] leading-[1.2] tracking-[-0.015em] text-black">
+                  <p className="text-[0.98rem] font-[660] leading-[1.2] tracking-[-0.015em] text-black md:text-[1.18rem]">
                     {bullet.title}
                   </p>
-                  <p className="mt-1 text-[0.85rem] leading-[1.4] tracking-[-0.005em] text-black/72">
+                  <p className="mt-1.5 text-[0.88rem] leading-[1.45] tracking-[-0.005em] text-black/72 md:mt-2 md:text-[0.98rem] md:leading-[1.55]">
                     {bullet.body}
                   </p>
                 </div>
@@ -372,55 +438,75 @@ export default function Home() {
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
-      <section className="relative mx-auto w-full max-w-[420px] px-5 pb-8">
-        <h2 className="text-[0.78rem] font-[640] uppercase tracking-[0.16em] text-black/58">
-          Ils en parlent
-        </h2>
-        <div className="mt-3 space-y-3">
-          {PLACEHOLDER_TESTIMONIALS.map((testimonial) => (
-            <figure
-              key={testimonial.id}
-              className="rounded-[20px] border border-black/12 bg-white/72 p-4 backdrop-blur-sm"
+      {/* SECTION 3 — TESTIMONIALS. Same grid pattern. */}
+      <section className="relative">
+        <div className="mx-auto w-full max-w-[1180px] px-5 pb-12 md:px-10 md:pb-20 lg:pb-24">
+          <h2 className="text-[0.78rem] font-[640] uppercase tracking-[0.18em] text-black/58 md:text-center md:text-[0.84rem]">
+            Ils en parlent
+          </h2>
+          <div className="mt-4 grid gap-3 md:mt-10 md:grid-cols-3 md:gap-6">
+            {PLACEHOLDER_TESTIMONIALS.map((testimonial) => (
+              <figure
+                key={testimonial.id}
+                className="rounded-[20px] border border-black/12 bg-white/78 p-5 backdrop-blur-sm md:rounded-[24px] md:p-7"
+              >
+                <blockquote className="text-[0.95rem] font-[480] leading-[1.45] tracking-[-0.008em] text-black md:text-[1.02rem] md:leading-[1.55]">
+                  « {testimonial.quote} »
+                </blockquote>
+                <figcaption className="mt-3 text-[0.78rem] font-[600] tracking-[0.005em] text-black/58 md:text-[0.84rem]">
+                  — {testimonial.name}, {testimonial.city}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+          <p className="mt-3 text-[0.7rem] leading-[1.4] tracking-[0.005em] text-black/45 md:mt-4 md:text-center md:text-[0.78rem]">
+            Témoignages illustratifs présentés à titre d'exemple.
+          </p>
+        </div>
+      </section>
+
+      {/* SECTION 4 — FAQ. Single column on all sizes, just constrained on desktop. */}
+      <section className="relative">
+        <div className="mx-auto w-full max-w-[760px] px-5 pb-28 md:px-10 md:pb-24 lg:pb-32">
+          <h2 className="text-[0.78rem] font-[640] uppercase tracking-[0.18em] text-black/58 md:text-center md:text-[0.84rem]">
+            FAQ
+          </h2>
+          <div className="mt-4 rounded-[20px] border border-black/12 bg-white/78 px-5 backdrop-blur-sm md:mt-8 md:rounded-[24px] md:px-8">
+            {FAQ_ITEMS.map((item) => (
+              <FaqRow key={item.id} item={item} />
+            ))}
+          </div>
+
+          {/* Final CTA + footer link, desktop has its own button (mobile uses sticky bar). */}
+          <div className="mt-10 hidden flex-col items-center md:flex">
+            <div className="w-full max-w-[400px]" style={{ animation: "ctaPulse 2.8s ease-in-out infinite" }}>
+              <PrimaryCta href={telegramGroupHref} onTrack={handlePrimaryClick} size="hero" />
+            </div>
+            <a
+              href={directContactUrl}
+              target="_self"
+              onClick={handleContactClick}
+              className="mt-4 inline-flex items-center gap-2 text-[0.92rem] font-[540] tracking-[-0.01em] text-black/65 transition-colors hover:text-black"
             >
-              <blockquote className="text-[0.92rem] font-[480] leading-[1.4] tracking-[-0.01em] text-black">
-                « {testimonial.quote} »
-              </blockquote>
-              <figcaption className="mt-2 text-[0.75rem] font-[540] tracking-[0.01em] text-black/58">
-                {testimonial.name}, {testimonial.city}
-              </figcaption>
-            </figure>
-          ))}
-        </div>
-        <p className="mt-2 text-[0.66rem] leading-[1.35] tracking-[0.005em] text-black/45">
-          Témoignages illustratifs présentés à titre d'exemple.
-        </p>
-      </section>
+              <TelegramIcon size={20} />
+              <span>Me contacter directement</span>
+            </a>
+          </div>
 
-      {/* FAQ */}
-      <section className="relative mx-auto w-full max-w-[420px] px-5 pb-32">
-        <h2 className="text-[0.78rem] font-[640] uppercase tracking-[0.16em] text-black/58">
-          FAQ
-        </h2>
-        <div className="mt-3 rounded-[20px] border border-black/12 bg-white/72 px-4 backdrop-blur-sm">
-          {FAQ_ITEMS.map((item) => (
-            <FaqRow key={item.id} item={item} />
-          ))}
-        </div>
-
-        <div className="mt-6 flex flex-col items-center gap-1">
-          <p className="text-[0.74rem] font-normal tracking-[-0.005em] text-black/35">Join Mister B</p>
-          <a
-            href="/dashboard"
-            className="text-[0.62rem] font-medium uppercase tracking-[0.14em] text-black/30 transition hover:text-black/55"
-          >
-            Accès suivi privé
-          </a>
+          <div className="mt-10 flex flex-col items-center gap-1 md:mt-14">
+            <p className="text-[0.74rem] font-normal tracking-[-0.005em] text-black/35">Join Mister B</p>
+            <a
+              href="/dashboard"
+              className="text-[0.62rem] font-medium uppercase tracking-[0.14em] text-black/30 transition hover:text-black/55"
+            >
+              Accès suivi privé
+            </a>
+          </div>
         </div>
       </section>
 
-      {/* STICKY MOBILE CTA */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/10 bg-[#1BD51C]/92 px-4 pb-[max(env(safe-area-inset-bottom,12px),12px)] pt-3 backdrop-blur-md">
+      {/* STICKY MOBILE CTA — hidden on md+ since the desktop hero CTA + post-FAQ CTA cover that role. */}
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-black/10 bg-[#1BD51C]/92 px-4 pb-[max(env(safe-area-inset-bottom,12px),12px)] pt-3 backdrop-blur-md md:hidden">
         <div className="mx-auto w-full max-w-[420px]">
           <PrimaryCta href={telegramGroupHref} onTrack={handlePrimaryClick} size="sticky" />
         </div>
