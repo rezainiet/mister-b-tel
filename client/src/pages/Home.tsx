@@ -29,28 +29,27 @@ const logoUrl =
 // a number that reads weak. Counts above this render verbatim — no inflation.
 const PUBLIC_COUNT_DISPLAY_FLOOR = 80;
 
-// Placeholder testimonials. These are LABELED as illustrative below the page
-// — replace with real, consented quotes before running paid traffic. Keeping
-// them in the source so the layout always renders; the disclaimer below the
-// section makes the legal posture clear.
+// Illustrative testimonials. The disclaimer in the JSX below makes their
+// posture clear; replace with real consented quotes once available.
 const PLACEHOLDER_TESTIMONIALS = [
   {
     id: "karim-lyon",
     name: "Karim",
     city: "Lyon",
-    quote: "Très réactif, j'ai eu accès à tout en moins d'une minute.",
+    quote:
+      "J'ai cliqué un peu par curiosité, et franchement le contenu vaut clairement le détour.",
   },
   {
     id: "sofia-paris",
     name: "Sofia",
     city: "Paris",
-    quote: "Le canal vaut clairement le détour, contenu exclusif tous les jours.",
+    quote: "C'est direct, ça va à l'essentiel. Pas de spam, pas de blabla.",
   },
   {
     id: "yacine-marseille",
     name: "Yacine",
     city: "Marseille",
-    quote: "J'ai jamais vu un service aussi propre et direct, je recommande.",
+    quote: "Beaucoup de canaux promettent — celui-là tient. Je suis resté.",
   },
 ] as const;
 
@@ -58,20 +57,20 @@ const VALUE_BULLETS = [
   {
     id: "exclusivites",
     icon: "★",
-    title: "Plans privés en avant-première",
-    body: "Tu reçois en premier les infos partagées en interne — avant tout le monde.",
+    title: "Du contenu en avant-première",
+    body: "Tu reçois ce qui ne passe pas en public — avant tout le monde.",
   },
   {
     id: "direct",
     icon: "✉",
-    title: "Échange direct avec Mister",
-    body: "Une question ou un besoin précis ? Tu peux écrire directement, sans intermédiaire.",
+    title: "Un échange direct",
+    body: "Une question, un besoin ? Tu écris, j'y réponds. Sans intermédiaire.",
   },
   {
     id: "selectif",
     icon: "✓",
-    title: "Accès sélectif",
-    body: "Le canal est privé et limité — tu rejoins une communauté réelle, pas une mailing-list.",
+    title: "Une communauté triée",
+    body: "Pas une mailing-list de 100 000 inconnus. Un canal privé entre vrais membres.",
   },
 ] as const;
 
@@ -79,27 +78,27 @@ const FAQ_ITEMS = [
   {
     id: "free",
     q: "C'est gratuit ?",
-    a: "Oui, l'accès au canal privé est offert. Aucune carte demandée, aucun engagement.",
+    a: "Oui. Aucun paiement, aucune carte demandée, aucun engagement.",
   },
   {
     id: "delay",
     q: "Combien de temps avant d'avoir accès ?",
-    a: "Immédiat. Tu cliques, tu valides sur Telegram, le bot t'envoie le lien WhatsApp dans la seconde.",
+    a: "Immédiat. Tu cliques, tu y es.",
   },
   {
     id: "what",
     q: "Qu'est-ce que je reçois exactement ?",
-    a: "Un accès au canal WhatsApp privé Mister B et la possibilité d'écrire directement.",
+    a: "L'accès au canal WhatsApp privé de Mister B, et la possibilité de m'écrire en direct.",
   },
   {
     id: "leave",
     q: "Je peux me désabonner ?",
-    a: "Oui, à tout moment. Tu quittes le canal WhatsApp en un clic, sans justification.",
+    a: "Oui, à tout moment. Tu quittes le canal en un clic, sans justification.",
   },
   {
     id: "why-wa",
-    q: "Pourquoi WhatsApp et pas autre chose ?",
-    a: "C'est la messagerie la plus fluide pour rester en contact direct. Le bot Telegram sert juste à valider l'accès et à filtrer les bots.",
+    q: "Pourquoi WhatsApp ?",
+    a: "C'est l'app que tout le monde a déjà. Pas de nouveau compte à créer, rien à installer.",
   },
 ] as const;
 
@@ -320,11 +319,11 @@ export default function Home() {
         <h1 className="mt-4 text-[2.5rem] font-[700] tracking-[-0.05em] text-black">Mister B</h1>
 
         <p className="mt-3 max-w-[330px] text-[1.45rem] font-[620] leading-[1.1] tracking-[-0.035em] text-black">
-          Le canal privé n°1 en France pour rester en contact direct.
+          Bienvenue dans l'espace privé.
         </p>
 
         <p className="mt-3 max-w-[320px] text-[0.92rem] font-[440] leading-[1.35] tracking-[-0.015em] text-black/78">
-          Accès gratuit au canal WhatsApp privé. Tu valides sur Telegram, le bot t'envoie le lien dans la seconde.
+          Reçois ce qui ne sort pas en public, directement sur WhatsApp. Accès gratuit, en un clic.
         </p>
 
         <div className="mt-5 w-full" style={{ animation: "ctaPulse 2.8s ease-in-out infinite" }}>
