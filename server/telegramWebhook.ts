@@ -303,36 +303,49 @@ async function handleCallbackQuery(query: TelegramCallbackQuery) {
 
   if (data !== JOINED_WHATSAPP_CALLBACK) {
     // Unknown callback — ack so the spinner stops; ignore the action.
-    await answerCallbackQuery(query.id, "Action inconnue.");
+    void answerCallbackQuery(query.id, "Action inconnue.");
     return;
   }
 
+  // Ack-first: the user's loading spinner stops the moment Telegram sees
+  // the answerCallbackQuery response, NOT when our webhook returns 200.
+  // Firing it before the DB read drops the perceived latency from ~1.5–2.5s
+  // (waiting on a sequential read + 2 writes + DM) to ~200ms (just the
+  // round-trip to Telegram's API). The user-facing text is the success
+  // message in both first-tap and repeat-tap cases — a duplicate tap showing
+  // "Déjà confirmé" was confusing in UAT.
+  void answerCallbackQuery(query.id, "Merci, c'est noté ✅");
+
   // Pull existing state so we can be idempotent: pressing the button twice
   // shouldn't bury the original joinedAt or re-cancel reminders that are
-  // already cancelled.
+  // already cancelled. This now happens AFTER the ack — slow DB no longer
+  // makes the spinner spin.
   const existing = await getBotStartByTelegramUserId(userId);
   const wasFirstConfirmation = Boolean(existing && !existing.joinedAt);
 
   if (wasFirstConfirmation) {
-    await Promise.all([
+    // Two parallel writes + a thank-you DM, all fully fire-and-forget.
+    // Failures are logged but never surface to the user (the spinner
+    // already stopped via the ack above).
+    void Promise.all([
       markBotStartJoined(userId),
       skipPendingTelegramReminderJobs(userId, "joined_group"),
-    ]);
+    ]).catch((error) => {
+      log.error("telegramWebhook", "join_self_confirm_writes_failed", {
+        telegramUserId: userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
+
     log.info("telegramWebhook", "join_self_confirmed", { telegramUserId: userId });
-  }
 
-  await answerCallbackQuery(
-    query.id,
-    wasFirstConfirmation ? "Merci, c'est noté ✅" : "Déjà confirmé ✅",
-  );
-
-  // Send a short confirmation DM the first time only — repeated taps shouldn't
-  // spam the chat.
-  if (wasFirstConfirmation && query.message?.chat?.id) {
-    await sendTelegramMessage(
-      query.message.chat.id,
-      "Merci ! On arrête les rappels. Tu peux me contacter à tout moment ici : @MisterBNMB",
-    );
+    // Thank-you DM — async, doesn't block this handler returning.
+    if (query.message?.chat?.id) {
+      void sendTelegramMessage(
+        query.message.chat.id,
+        "Merci ! On arrête les rappels. Tu peux me contacter à tout moment ici : @MisterBNMB",
+      );
+    }
   }
 }
 

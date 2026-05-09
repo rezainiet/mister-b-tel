@@ -16,6 +16,29 @@ import { skipPendingTelegramReminderJobs } from "./telegramReminders";
 
 const META_RETRY_DELAY_MS = 5 * 60 * 1000;
 
+// In-process cache for the WhatsApp destination URL. The setting is operator-
+// editable from the dashboard, so we re-read it periodically — but every
+// /wa-go redirect should answer in <50ms, which means no DB call in the
+// user's critical path. The cache is warmed at boot and refreshed every
+// DESTINATION_REFRESH_MS in the background. First-ever request before the
+// warm-up returns DEFAULT_TELEGRAM_GROUP_URL.
+const DESTINATION_REFRESH_MS = 30_000;
+let cachedDestinationUrl: string = DEFAULT_TELEGRAM_GROUP_URL;
+let destinationRefreshTimer: NodeJS.Timeout | null = null;
+
+async function refreshDestinationCache() {
+  try {
+    const fresh = await getTelegramGroupUrl();
+    if (fresh) cachedDestinationUrl = fresh;
+  } catch (error) {
+    log.warn("whatsappRedirect", "destination_refresh_failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // Keep the previous value rather than reverting to DEFAULT — a transient
+    // DB blip shouldn't make existing redirects suddenly go to the fallback.
+  }
+}
+
 /**
  * Build the per-user tracked redirect URL the bot includes in welcome/reminder
  * DMs.
@@ -53,6 +76,18 @@ function getQueryString(value: unknown): string | undefined {
 }
 
 export function setupWhatsappRedirectRoute(app: Express) {
+  // Warm the cache once at boot so the very first redirect already uses the
+  // operator-configured URL instead of the hardcoded fallback. Then refresh
+  // periodically in the background so dashboard updates propagate without
+  // requiring a redeploy.
+  void refreshDestinationCache();
+  if (!destinationRefreshTimer) {
+    destinationRefreshTimer = setInterval(() => {
+      void refreshDestinationCache();
+    }, DESTINATION_REFRESH_MS);
+    destinationRefreshTimer.unref?.();
+  }
+
   // Both paths are registered: /wa-go is the production-canonical path used
   // by all bot-DM messages (Cloudflare intercepts /r/* on mister-b.club so
   // the original /r/wa never reaches origin). /r/wa is kept registered as a
@@ -64,42 +99,36 @@ export function setupWhatsappRedirectRoute(app: Express) {
   app.get("/r/wa", handler);
 }
 
-async function handleWhatsappRedirect(req: Request, res: Response) {
-    const telegramUserId = getQueryString(req.query.u);
-    const suppliedSessionToken = getQueryString(req.query.s);
-    const suppliedFunnelToken = getQueryString(req.query.f);
+function handleWhatsappRedirect(req: Request, res: Response) {
+  const telegramUserId = getQueryString(req.query.u);
+  const suppliedSessionToken = getQueryString(req.query.s);
+  const suppliedFunnelToken = getQueryString(req.query.f);
 
-    // Resolve destination first so the redirect always works even if all
-    // logging/Meta calls fail. Tracking is best-effort, the user's click is not.
-    let destinationUrl = DEFAULT_TELEGRAM_GROUP_URL;
-    try {
-      destinationUrl = (await getTelegramGroupUrl()) || DEFAULT_TELEGRAM_GROUP_URL;
-    } catch (error) {
-      log.warn("whatsappRedirect", "destination_lookup_failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+  // Synchronous read — no DB call in the user's critical path. The cache
+  // is refreshed on a 30s interval so dashboard updates propagate quickly
+  // enough without making every redirect wait on a settings lookup.
+  const destinationUrl = cachedDestinationUrl;
 
-    // Fire-and-forget the side effects so the user is redirected immediately.
-    // Anything slow (DB write, Meta CAPI round-trip) must not block the 302.
-    void recordWhatsappClick({
+  // Fire-and-forget every side effect so the 302 ships immediately.
+  // Anything slow (DB write, Meta CAPI round-trip) is fully detached.
+  void recordWhatsappClick({
+    telegramUserId,
+    suppliedSessionToken,
+    suppliedFunnelToken,
+    ip:
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
+      req.socket?.remoteAddress ||
+      null,
+    userAgent: (req.headers["user-agent"] as string) || null,
+    referer: (req.headers.referer as string) || null,
+  }).catch((error) => {
+    log.error("whatsappRedirect", "side_effects_failed", {
       telegramUserId,
-      suppliedSessionToken,
-      suppliedFunnelToken,
-      ip:
-        (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
-        req.socket?.remoteAddress ||
-        null,
-      userAgent: (req.headers["user-agent"] as string) || null,
-      referer: (req.headers.referer as string) || null,
-    }).catch((error) => {
-      log.error("whatsappRedirect", "side_effects_failed", {
-        telegramUserId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      error: error instanceof Error ? error.message : String(error),
     });
+  });
 
-    res.redirect(302, destinationUrl);
+  res.redirect(302, destinationUrl);
 }
 
 async function recordWhatsappClick(args: {
